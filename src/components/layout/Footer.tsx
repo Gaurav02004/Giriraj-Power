@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useShop } from '../../context/ShopContext';
 import { CATEGORIES } from '../../data/categories';
 import { BRANDS } from '../../data/brands';
+import { GirirajPowerLogo } from '../common/GirirajPowerLogo';
 import {
   Zap,
   Phone,
@@ -88,8 +89,8 @@ export const Footer: React.FC = () => {
           {/* Col 1: Brand & Contact Info */}
           <div className="lg:col-span-2 space-y-4">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-xl bg-[#f2b808] flex items-center justify-center text-black shadow-md">
-                <Zap className="w-6 h-6 fill-black text-black" />
+              <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center shadow-lg border border-neutral-800 p-0.5 group-hover:scale-105 transition-transform overflow-hidden">
+                <GirirajPowerLogo className="w-full h-full" withBg={false} />
               </div>
               <div>
                 <span className="text-2xl font-black tracking-tight text-white">

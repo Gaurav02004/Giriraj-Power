@@ -138,7 +138,7 @@ export const HomePage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#15803d] animate-ping" />
                 <span className="text-xs font-bold text-[#15803d] uppercase tracking-wider">
-                  In Stock for 60-Min Site Dispatch ({pincode || '560025'})
+                  In Stock for 60-Min Site Dispatch ({pincode || '700039'})
                 </span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-neutral-950 tracking-tight mt-1">

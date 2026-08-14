@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useShop } from '../../context/ShopContext';
 import { CATEGORIES } from '../../data/categories';
+import { GirirajPowerLogo } from '../common/GirirajPowerLogo';
 import {
   Search,
   Zap,
@@ -203,10 +204,10 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center justify-between h-20 gap-4 lg:gap-8">
           {/* Logo & Location Container */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-            {/* Logo: Giriraj Power with Lightning Bolt Icon Box */}
+            {/* Logo: Giriraj Power with Custom 3D Electric Logo */}
             <Link to="/" className="flex flex-col items-center justify-center group shrink-0" title="Giriraj Power - Fast Construction Materials">
-              <div className="w-10 h-10 rounded-lg bg-[#f2b808] flex items-center justify-center text-black shadow-2xs group-hover:scale-105 transition-transform">
-                <Zap className="w-6 h-6 fill-black text-black" />
+              <div className="w-11 h-11 rounded-xl bg-black flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform overflow-hidden p-0.5 border border-neutral-800">
+                <GirirajPowerLogo className="w-full h-full" withBg={false} />
               </div>
               <span className="text-[11px] font-black text-neutral-950 tracking-tight leading-none mt-1 whitespace-nowrap">
                 Giriraj <span className="text-[#0d8244]">Power</span>
@@ -234,7 +235,7 @@ export const Navbar: React.FC = () => {
                 <span className="text-[11px] text-neutral-500 font-medium">Deliver To</span>
                 <div className="flex items-center gap-0.5 text-xs sm:text-sm font-black text-neutral-900 group-hover:text-[#15803d] transition-colors">
                   <MapPin className="w-3.5 h-3.5 text-neutral-800 shrink-0" />
-                  <span>{pincode || '560025'}</span>
+                  <span>{pincode || '700039'}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-neutral-600 group-hover:translate-y-0.5 transition-transform" />
                 </div>
               </div>
@@ -449,7 +450,7 @@ export const Navbar: React.FC = () => {
               <span>60-Minute Site Delivery Active</span>
             </span>
             <p className="text-[11px] text-neutral-600 mt-0.5">
-              Delivering to PIN: <strong>{pincode || '560025'}</strong> ({areaName || city})
+              Delivering to PIN: <strong>{pincode || '700039'}</strong> ({areaName || city})
             </p>
           </div>
 

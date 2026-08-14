@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useShop } from '../../context/ShopContext';
+import { GirirajPowerLogo } from '../common/GirirajPowerLogo';
 import {
   MapPin,
   Truck,
@@ -23,17 +24,10 @@ export const HomeRunHero: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch min-h-[460px]">
             {/* Left Content Area (Columns 1 to 6/7) */}
             <div className="lg:col-span-6 p-6 sm:p-8 lg:p-12 flex flex-col justify-center space-y-6 z-10">
-              {/* Location Badge (Serving Bangalore / Kolkata) */}
+              {/* Location Badge (Serving Kolkata) */}
               <div className="inline-flex items-center gap-1.5 self-start bg-[#e8f5e9] text-[#15803d] font-bold text-xs sm:text-sm px-3.5 py-1.5 rounded-full border border-emerald-200">
                 <MapPin className="w-4 h-4 text-[#15803d] fill-[#15803d]/20" />
-                <span>Serving {city || 'Bangalore'} ({pincode || '560025'})</span>
-                <button
-                  type="button"
-                  onClick={openPincodeModal}
-                  className="ml-1 text-[11px] underline text-emerald-800 hover:text-black font-semibold cursor-pointer"
-                >
-                  Change
-                </button>
+                <span>Serving {city || 'Kolkata'}</span>
               </div>
 
               {/* Main Headline (Exact Typography as Screenshot) */}
@@ -145,8 +139,8 @@ export const HomeRunHero: React.FC = () => {
                   {/* Top Truck Cabin Badge */}
                   <div className="flex items-center justify-between border-b border-neutral-700 pb-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-md bg-[#f2b808] flex items-center justify-center">
-                        <Zap className="w-4 h-4 fill-black text-black" />
+                      <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center p-0.5 border border-neutral-700">
+                        <GirirajPowerLogo className="w-full h-full" withBg={false} />
                       </div>
                       <span className="text-xs font-black text-white tracking-wide">
                         Giriraj <span className="text-[#4ade80]">Power</span> Express Fleet
@@ -205,15 +199,15 @@ export const HomeRunHero: React.FC = () => {
                   {/* Truck Tailgate Brand Plate */}
                   <div className="bg-neutral-950 rounded-xl p-2.5 flex items-center justify-between border border-neutral-800">
                     <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-[#f2b808] flex items-center justify-center">
-                        <Zap className="w-3.5 h-3.5 text-black fill-black" />
+                      <div className="w-6 h-6 rounded-md bg-black flex items-center justify-center p-0.5 border border-neutral-700">
+                        <GirirajPowerLogo className="w-full h-full" withBg={false} />
                       </div>
                       <span className="text-xs font-black text-white tracking-widest font-sans uppercase">
-                        ⚡ Giriraj Power
+                        Giriraj Power
                       </span>
                     </div>
                     <span className="text-[10px] text-neutral-400 font-mono">
-                      KA-01-HR-6001 • EXPRESS
+                      WB-01-GP-6001 • EXPRESS
                     </span>
                   </div>
                 </div>
