@@ -213,8 +213,8 @@ export const Navbar: React.FC = () => {
                 <GirirajPowerLogo className="w-full h-full" withBg={false} />
               </div>
               <div className="flex flex-col">
-                <span className="text-base sm:text-lg font-black text-black tracking-tight uppercase leading-none">
-                  GIRIRAJ POWER
+                <span className="text-base sm:text-lg font-black text-black tracking-tight leading-none">
+                  Giriraj Power
                 </span>
                 <span className="text-[10px] font-bold text-neutral-600 tracking-wider uppercase mt-0.5">
                   Powering Every Project
