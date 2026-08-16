@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Product, CartItem, WishlistItem, QuoteRequest, Order, ToastNotification } from '../types';
 import { PRODUCTS } from '../data/products';
 import { INITIAL_ORDERS, INITIAL_QUOTES } from '../data/adminMock';
+import {
+  getFirestoreProducts,
+  syncProductsToFirestore,
+  updateFirestoreProductStock,
+} from '../firebase/productService';
 
 interface ShopContextType {
   products: Product[];
@@ -50,6 +55,8 @@ interface ShopContextType {
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: string) => void;
   updateStock: (productId: string, newStock: number) => void;
+  syncWithFirestore: () => Promise<void>;
+  isFirestoreSynced: boolean;
   // UI Helpers
   showToast: (title: string, message: string, type?: ToastNotification['type']) => void;
   removeToast: (id: string) => void;
@@ -79,6 +86,46 @@ export const ShopProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return PRODUCTS;
     }
   });
+
+  const [isFirestoreSynced, setIsFirestoreSynced] = useState(false);
+
+  // Synchronize Firestore product catalog on application startup
+  useEffect(() => {
+    let isMounted = true;
+    const initializeFirestoreProducts = async () => {
+      try {
+        const firestoreProds = await getFirestoreProducts();
+        if (isMounted) {
+          if (firestoreProds && firestoreProds.length > 0) {
+            setProducts(firestoreProds);
+            setIsFirestoreSynced(true);
+          } else {
+            // If Firestore is empty, seed initial catalog
+            await syncProductsToFirestore(PRODUCTS);
+            setIsFirestoreSynced(true);
+          }
+        }
+      } catch (err) {
+        console.warn('Firestore products initialization notice:', err);
+        // Continue with local products gracefully
+      }
+    };
+
+    initializeFirestoreProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const syncWithFirestore = async () => {
+    try {
+      await syncProductsToFirestore(products);
+      setIsFirestoreSynced(true);
+      showToast('Firestore Synced', `${products.length} catalog items updated in Cloud database.`, 'success');
+    } catch (err: any) {
+      showToast('Sync Error', err.message || 'Failed to sync with Firestore', 'error');
+    }
+  };
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -341,7 +388,7 @@ export const ShopProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setQuotes((prev) => [newQuote, ...prev]);
     showToast(
       'Quotation Request Submitted',
-      'Thank you. Our PowerRun technical sales team will contact you shortly with your custom B2B estimate.',
+      'Thank you. Our Giriraj Power technical sales team will contact you shortly with your custom B2B estimate.',
       'success'
     );
     return newQuote;
@@ -398,6 +445,10 @@ export const ShopProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         p.id === productId ? { ...p, stock: newStock, inStock: newStock > 0 } : p
       )
     );
+    // Asynchronously update in Firestore
+    updateFirestoreProductStock(productId, newStock).catch((err) => {
+      console.warn(`Firestore stock sync note for ${productId}:`, err);
+    });
     showToast('Stock Updated', `Inventory updated to ${newStock} units.`, 'info');
   };
 
@@ -454,6 +505,8 @@ export const ShopProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateProduct,
         deleteProduct,
         updateStock,
+        syncWithFirestore,
+        isFirestoreSynced,
         showToast,
         removeToast,
         formatPrice,

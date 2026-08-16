@@ -1,0 +1,107 @@
+{
+  "entities": {
+    "products": {
+      "title": "Product",
+      "description": "Catalog products for electrical and construction materials.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Product name" },
+        "price": { "type": "number", "description": "Unit price in INR" },
+        "stock": { "type": "number", "description": "Available inventory units" },
+        "imageUrl": { "type": "string", "description": "Image URL of the product" },
+        "category": { "type": "string", "description": "Category slug or name" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["name", "price", "stock", "category"]
+    },
+    "orders": {
+      "title": "Order",
+      "description": "Customer orders placed via site checkout.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of customer" },
+        "userPhone": { "type": "string", "description": "Verified phone number of customer" },
+        "items": {
+          "type": "array",
+          "description": "Array of ordered products",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "qty": { "type": "number" },
+              "price": { "type": "number" }
+            },
+            "required": ["productId", "name", "qty", "price"]
+          }
+        },
+        "totalAmount": { "type": "number", "description": "Grand total in INR" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "delivered", "cancelled"],
+          "description": "Order processing state"
+        },
+        "createdAt": { "type": "string", "description": "Order creation timestamp" },
+        "deliveryAddress": { "type": "string", "description": "Complete site delivery address" }
+      },
+      "required": ["userId", "userPhone", "items", "totalAmount", "status", "createdAt", "deliveryAddress"]
+    },
+    "users": {
+      "title": "UserProfile",
+      "description": "User profile with verified phone and address history.",
+      "type": "object",
+      "properties": {
+        "phoneNumber": { "type": "string", "description": "Primary phone number" },
+        "name": { "type": "string", "description": "Contractor or customer full name" },
+        "addresses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Saved delivery addresses"
+        },
+        "createdAt": { "type": "string", "description": "Account registration timestamp" },
+        "lastLogin": { "type": "string", "description": "Last authenticated timestamp" }
+      },
+      "required": ["phoneNumber", "createdAt"]
+    },
+    "adminNotifications": {
+      "title": "AdminNotification",
+      "description": "Instant notifications sent to admin on new orders.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Associated order ID" },
+        "userPhone": { "type": "string", "description": "Customer phone number" },
+        "totalAmount": { "type": "number", "description": "Order amount" },
+        "itemsCount": { "type": "number", "description": "Number of items" },
+        "message": { "type": "string", "description": "Notification description" },
+        "createdAt": { "type": "string", "description": "Timestamp" },
+        "read": { "type": "boolean", "description": "Read status" }
+      },
+      "required": ["orderId", "userPhone", "totalAmount", "createdAt"]
+    }
+  },
+  "rules": {
+    "adminUid": "ADMIN_MASTER_UID_DEFAULT",
+    "collections": {
+      "users": {
+        "read": "request.auth != null && (request.auth.uid == uid || request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT')",
+        "write": "request.auth != null && (request.auth.uid == uid || request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT')"
+      },
+      "products": {
+        "read": "true",
+        "write": "request.auth != null && request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT'"
+      },
+      "orders": {
+        "read": "request.auth != null && (resource.data.userId == request.auth.uid || request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT')",
+        "create": "request.auth != null && request.resource.data.userId == request.auth.uid",
+        "update": "request.auth != null && request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT'",
+        "delete": "request.auth != null && request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT'"
+      },
+      "adminNotifications": {
+        "read": "request.auth != null && request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT'",
+        "create": "request.auth != null",
+        "update": "request.auth != null && request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT'",
+        "delete": "request.auth != null && request.auth.uid == 'ADMIN_MASTER_UID_DEFAULT'"
+      }
+    }
+  }
+}

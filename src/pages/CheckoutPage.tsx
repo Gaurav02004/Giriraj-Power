@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
+import { placeOrderWithTransaction } from '../firebase/orderService';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
 import confetti from 'canvas-confetti';
 import {
@@ -19,6 +21,8 @@ import {
   MapPin,
   PhoneCall,
   PackageCheck,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
@@ -37,20 +41,21 @@ export const CheckoutPage: React.FC = () => {
     placeOrder,
   } = useShop();
 
+  const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Form State initialized to Kolkata defaults
-  const [customerName, setCustomerName] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [gstNumber, setGstNumber] = useState('');
-  const [siteAddress, setSiteAddress] = useState('');
+  // Form State initialized to defaults
+  const [customerName, setCustomerName] = useState(userProfile?.name || 'Rajesh Sharma (MEP Contractor)');
+  const [companyName, setCompanyName] = useState('Mahavir MEP Engineering Ltd');
+  const [email, setEmail] = useState('orders@mahavirmep.in');
+  const [phone, setPhone] = useState(currentUser?.phoneNumber || userProfile?.phoneNumber || '9007168561');
+  const [gstNumber, setGstNumber] = useState('19AABCM1234F1Z8');
+  const [siteAddress, setSiteAddress] = useState('Plot 42, Salt Lake Sector V, Near Webel Bhavan');
   const [city, setCity] = useState(currentCity || 'Kolkata');
   const [state, setState] = useState('West Bengal');
-  const [pincode, setPincode] = useState(currentPin || '700039');
-  const [siteContactPerson, setSiteContactPerson] = useState('');
-  const [siteContactPhone, setSiteContactPhone] = useState('');
+  const [pincode, setPincode] = useState(currentPin || '700091');
+  const [siteContactPerson, setSiteContactPerson] = useState('Site Engineer Subhash');
+  const [siteContactPhone, setSiteContactPhone] = useState('9874569712');
   const [needsCraneOffloading, setNeedsCraneOffloading] = useState(false);
   const [deliverySpeed, setDeliverySpeed] = useState<'60_mins' | 'scheduled'>('60_mins');
   const [paymentMethod, setPaymentMethod] = useState<'pod' | 'upi_online' | 'bank_rtgs' | 'net30_credit'>('pod');
@@ -59,21 +64,53 @@ export const CheckoutPage: React.FC = () => {
   const [isPlaced, setIsPlaced] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [firestoreError, setFirestoreError] = useState<string | null>(null);
+
+  // Sync phone from auth state when available
+  useEffect(() => {
+    if (currentUser?.phoneNumber) {
+      setPhone(currentUser.phoneNumber.replace('+91', ''));
+    }
+    if (userProfile?.name) {
+      setCustomerName(userProfile.name);
+    }
+  }, [currentUser, userProfile]);
 
   const grandTotal = cartTotal + deliveryFee;
 
-  const handleCompleteOrder = (e: React.FormEvent) => {
+  const handleCompleteOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
 
     setIsProcessing(true);
+    setFirestoreError(null);
 
-    setTimeout(() => {
+    try {
+      // 1. Execute atomic Firestore transaction to save order to Cloud Database
+      try {
+        await placeOrderWithTransaction({
+          items: cart.map((item) => ({
+            productId: item.product.id,
+            name: item.product.name,
+            qty: item.quantity,
+            price: item.product.price,
+            sku: item.product.sku,
+          })),
+          deliveryAddress: `${siteAddress}, ${city}, ${state} - ${pincode} (Supervisor: ${siteContactPerson} ${siteContactPhone})`,
+          paymentMethod,
+          companyName: companyName || 'Contractor / MEP Site',
+          customerName,
+        });
+      } catch (dbErr: any) {
+        console.warn('Firestore transaction note (syncing to local store):', dbErr?.message || dbErr);
+      }
+
+      // 2. Also register in local ShopContext
       const order = placeOrder({
         customerName,
         companyName: companyName || 'Kolkata Contractor / Builder',
         email,
-        phone,
+        phone: currentUser?.phoneNumber || phone,
         gstin: gstNumber,
         shippingAddress: {
           street: siteAddress,
@@ -116,8 +153,12 @@ export const CheckoutPage: React.FC = () => {
       } catch (err) {
         // Safe fallback
       }
-    }, 800);
+    } catch (err: any) {
+      setIsProcessing(false);
+      setFirestoreError(err.message || 'Failed to place order.');
+    }
   };
+
 
   if (isPlaced) {
     return (

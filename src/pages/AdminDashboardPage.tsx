@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useShop } from '../context/ShopContext';
 import { Order, QuoteRequest } from '../types';
+import { AdminOrders } from '../components/admin/AdminOrders';
+import { generateGoogleMerchantXml, generateGoogleMerchantCsv } from '../utils/googleMerchantFeed';
 import {
   LayoutDashboard,
   Package,
@@ -10,6 +12,12 @@ import {
   Truck,
   Search,
   Eye,
+  ShoppingBag,
+  Download,
+  Copy,
+  Check,
+  ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -23,7 +31,8 @@ export const AdminDashboardPage: React.FC = () => {
     showToast,
   } = useShop();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'quotes' | 'inventory'>('overview');
+  const [activeTab, setActiveTab] = useState<'live_orders' | 'overview' | 'quotes' | 'inventory' | 'google_merchant'>('live_orders');
+  const [copiedFeed, setCopiedFeed] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
   const [quoteSearch, setQuoteSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -67,12 +76,12 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black text-black tracking-tight flex items-center gap-2">
-                  <span>PowerRun Supplier Dispatch Portal</span>
+                  <span>Giriraj Power Supplier Dispatch Portal</span>
                   <span className="text-[10px] bg-yellow-400 text-black px-2 py-0.5 rounded font-bold border border-yellow-500/30">
                     MASTER ADMIN
                   </span>
                 </h1>
-                <p className="text-xs text-neutral-500">Real-time B2B orders, BOQ quotation engine & central inventory hub</p>
+                <p className="text-xs text-neutral-500">Real-time B2B dispatches, verified buyer orders & master catalog inventory</p>
               </div>
             </div>
 
@@ -80,7 +89,7 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="flex items-center gap-2 text-xs">
               <span className="bg-neutral-50 border border-neutral-200 px-3 py-1.5 rounded-lg text-neutral-700 font-semibold flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-                <span>Live Dispatch Active</span>
+                <span>Dispatch Engine Active</span>
               </span>
             </div>
           </div>
@@ -88,17 +97,18 @@ export const AdminDashboardPage: React.FC = () => {
           {/* Navigation Tabs */}
           <div className="flex gap-2 mt-6 border-t border-neutral-200 pt-3 overflow-x-auto">
             {[
+              { key: 'live_orders', label: '📦 Live Dispatch Orders', icon: Truck },
               { key: 'overview', label: 'Dashboard Overview', icon: TrendingUp },
-              { key: 'orders', label: `Orders (${orders.length})`, icon: Truck },
               { key: 'quotes', label: `Quote Requests (${quotes.length})`, icon: FileText },
               { key: 'inventory', label: `Live Catalog (${products.length})`, icon: Package },
+              { key: 'google_merchant', label: '🛍️ Google Merchant Feed', icon: ShoppingBag },
             ].map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as any)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                     activeTab === tab.key
                       ? 'bg-black text-white shadow-md'
                       : 'bg-neutral-100 text-neutral-600 hover:text-black hover:bg-neutral-200'
@@ -115,6 +125,13 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {/* Real-time Orders Tab */}
+        {activeTab === 'live_orders' && (
+          <div className="space-y-6">
+            <AdminOrders />
+          </div>
+        )}
+
         {/* 1. OVERVIEW TAB */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
@@ -645,6 +662,132 @@ export const AdminDashboardPage: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: GOOGLE MERCHANT CENTER FEED EXPORTER */}
+        {activeTab === 'google_merchant' && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                    <ShoppingBag className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-black tracking-tight flex items-center gap-2">
+                      <span>Google Merchant Center Feed Generator</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                        {products.length} Products Compatible
+                      </span>
+                    </h2>
+                    <p className="text-xs text-neutral-500">
+                      Auto-sync all materials (Polycab wires, ACC/UltraTech cement, Roff adhesives, Havells switchgear) with Google Shopping & Google Search.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const xmlContent = generateGoogleMerchantXml(products);
+                      const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', 'giriraj-power-google-merchant-feed.xml');
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      showToast('XML Feed Downloaded', 'Google Merchant RSS 2.0 XML exported successfully.', 'success');
+                    }}
+                    className="flex items-center gap-1.5 bg-black hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download XML Feed</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csvContent = generateGoogleMerchantCsv(products);
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', 'giriraj-power-products.csv');
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      showToast('CSV Exported', 'Google Merchant Tab-delimited CSV ready for upload.', 'success');
+                    }}
+                    className="flex items-center gap-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download CSV Feed</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Feed Sync Guidelines */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-neutral-900">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span>1. Automated JSON-LD Crawling</span>
+                  </div>
+                  <p className="text-neutral-600 text-[11px]">
+                    Every product page on Giriraj Power includes schema.org/Product structured data so Google automatically reads stock, price & SKU in real time.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-neutral-900">
+                    <ExternalLink className="w-4 h-4 text-blue-500" />
+                    <span>2. Scheduled Merchant Fetch</span>
+                  </div>
+                  <p className="text-neutral-600 text-[11px]">
+                    In Google Merchant Center &gt; Feeds &gt; Primary Feeds, select "Scheduled fetch" and paste the XML Feed file or point to your domain endpoint.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-neutral-900">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span>3. Google Analytics Tag</span>
+                  </div>
+                  <p className="text-neutral-600 text-[11px]">
+                    Connected with measurement ID <code className="font-mono text-black font-bold">G-6R2F4MTZXB</code> to track conversions & product views.
+                  </p>
+                </div>
+              </div>
+
+              {/* Live XML Feed Preview Box */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                    Live XML Feed Preview (Sample First Product)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generateGoogleMerchantXml(products));
+                      setCopiedFeed(true);
+                      showToast('Copied to Clipboard', 'Complete Google Merchant XML copied.', 'success');
+                      setTimeout(() => setCopiedFeed(false), 3000);
+                    }}
+                    className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900 font-bold cursor-pointer"
+                  >
+                    {copiedFeed ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedFeed ? 'Copied XML!' : 'Copy Full Feed XML'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 bg-neutral-900 text-emerald-400 font-mono text-[11px] rounded-2xl overflow-x-auto max-h-72 border border-neutral-800 leading-relaxed">
+                  {generateGoogleMerchantXml(products.slice(0, 2))}
+                </pre>
               </div>
             </div>
           </div>

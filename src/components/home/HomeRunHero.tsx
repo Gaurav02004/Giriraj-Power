@@ -143,7 +143,7 @@ export const HomeRunHero: React.FC = () => {
                         <GirirajPowerLogo className="w-full h-full" withBg={false} />
                       </div>
                       <span className="text-xs font-black text-white tracking-wide">
-                        Giriraj <span className="text-[#4ade80]">Power</span> Express Fleet
+                        Giriraj Power Express Fleet
                       </span>
                     </div>
                     <span className="bg-[#15803d] text-white text-[10px] font-black px-2.5 py-0.5 rounded-full animate-pulse">

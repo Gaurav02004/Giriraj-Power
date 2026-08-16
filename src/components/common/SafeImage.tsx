@@ -24,7 +24,7 @@ export const SafeImage: React.FC<SafeImageProps> = ({
   return (
     <img
       src={hasError ? fallbackSrc : (src || fallbackSrc)}
-      alt={alt || 'PowerRun electrical material'}
+      alt={alt || 'Giriraj Power electrical material'}
       referrerPolicy="no-referrer"
       onError={handleError}
       className={className}

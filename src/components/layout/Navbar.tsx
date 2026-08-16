@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useShop } from '../../context/ShopContext';
-import { CATEGORIES } from '../../data/categories';
+import { useAuth } from '../../context/AuthContext';
 import { GirirajPowerLogo } from '../common/GirirajPowerLogo';
 import {
   Search,
@@ -12,10 +12,12 @@ import {
   MapPin,
   Menu,
   X,
-  Sparkles,
-  SlidersHorizontal,
   PhoneCall,
-  LayoutDashboard
+  LayoutDashboard,
+  Flame,
+  Truck,
+  ShieldCheck,
+  Building,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -28,6 +30,8 @@ export const Navbar: React.FC = () => {
     products,
     formatPrice,
   } = useShop();
+
+  const { currentUser, userProfile } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -114,7 +118,7 @@ export const Navbar: React.FC = () => {
     setSearchQuery('');
   };
 
-  // Nav menus matching the exact screenshot
+  // Nav menus
   const menuItems = [
     { label: 'Home', path: '/', hasDropdown: false },
     {
@@ -194,55 +198,53 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white text-neutral-900 shadow-xs">
-      {/* 1. TOP YELLOW BANNER (EXACT AS SCREENSHOT) */}
-      <div className="bg-[#f2b808] text-neutral-950 font-semibold text-xs sm:text-[13px] py-2 px-4 text-center tracking-normal select-none">
-        <span>Open 8 am to 8 pm all days</span>
-      </div>
-
-      {/* 2. MAIN NAVBAR ROW */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-neutral-100">
-        <div className="flex items-center justify-between h-20 gap-4 lg:gap-8">
-          {/* Logo & Location Container */}
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-            {/* Logo: Giriraj Power with Custom 3D Electric Logo */}
-            <Link to="/" className="flex flex-col items-center justify-center group shrink-0" title="Giriraj Power - Fast Construction Materials">
-              <div className="w-11 h-11 rounded-xl bg-black flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform overflow-hidden p-0.5 border border-neutral-800">
+      {/* 1. MAIN NAVBAR ROW */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-neutral-100 py-3 sm:py-3.5">
+        <div className="flex items-center justify-between gap-4 lg:gap-8">
+          {/* Left: Brand & Location Column Block */}
+          <div className="flex flex-col items-start gap-1 shrink-0">
+            {/* Top row of block: Logo on left, Business name GIRIRAJ POWER in SOLID TOTAL BLACK to the right of logo */}
+            <Link
+              to="/"
+              className="flex items-center gap-2.5 group cursor-pointer"
+              title="Giriraj Power - Powering Every Project"
+            >
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform overflow-hidden p-0.5 border border-neutral-800 shrink-0">
                 <GirirajPowerLogo className="w-full h-full" withBg={false} />
               </div>
-              <span className="text-[11px] font-black text-neutral-950 tracking-tight leading-none mt-1 whitespace-nowrap">
-                Giriraj <span className="text-[#0d8244]">Power</span>
-              </span>
+              <div className="flex flex-col">
+                <span className="text-base sm:text-lg font-black text-black tracking-tight uppercase leading-none">
+                  GIRIRAJ POWER
+                </span>
+                <span className="text-[10px] font-bold text-neutral-600 tracking-wider uppercase mt-0.5">
+                  Powering Every Project
+                </span>
+              </div>
             </Link>
 
-            {/* Vertical Divider */}
-            <div className="h-9 w-px bg-neutral-200 hidden sm:block"></div>
-
-            {/* Location & 60 Mins Badge (Exact as screenshot) */}
-            <div
+            {/* Bottom row of block: Location picker shifted below logo & store name (Swiggy app modal trigger) */}
+            <button
+              type="button"
               onClick={openPincodeModal}
               id="nav-location-picker"
-              className="flex items-center gap-2 cursor-pointer group select-none"
-              title="Click to select delivery area / PIN"
+              className="flex items-center gap-1.5 text-left group/loc cursor-pointer py-0.5 px-2 -ml-1 rounded-lg hover:bg-neutral-100 border border-transparent hover:border-neutral-200 transition-all select-none"
+              title="Click to select delivery area / PIN (Swiggy style)"
             >
-              {/* 60 Mins Dark Green Badge */}
-              <div className="bg-[#15803d] text-white font-black text-[11px] leading-tight px-2 py-1.5 rounded-lg flex flex-col items-center justify-center shrink-0 shadow-2xs">
-                <span>60</span>
-                <span className="text-[9px] -mt-0.5 font-bold">Mins</span>
+              <div className="bg-[#15803d] text-white font-black text-[9px] px-1.5 py-0.5 rounded leading-tight flex items-center gap-0.5 shadow-2xs">
+                <Zap className="w-2.5 h-2.5 fill-yellow-300 text-yellow-300" />
+                <span>60 Mins</span>
               </div>
-
-              {/* Deliver To & PIN Code */}
-              <div className="flex flex-col text-left leading-tight">
-                <span className="text-[11px] text-neutral-500 font-medium">Deliver To</span>
-                <div className="flex items-center gap-0.5 text-xs sm:text-sm font-black text-neutral-900 group-hover:text-[#15803d] transition-colors">
-                  <MapPin className="w-3.5 h-3.5 text-neutral-800 shrink-0" />
-                  <span>{pincode || '700039'}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-neutral-600 group-hover:translate-y-0.5 transition-transform" />
-                </div>
+              <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-neutral-900 group-hover/loc:text-[#15803d] transition-colors">
+                <MapPin className="w-3.5 h-3.5 text-neutral-800 shrink-0" />
+                <span className="truncate max-w-[125px] sm:max-w-[170px]">
+                  {pincode ? `${pincode} (${areaName ? areaName.split('/')[0] : 'Kolkata'})` : '700039 (Topsia)'}
+                </span>
+                <ChevronDown className="w-3 h-3 text-neutral-600 group-hover/loc:translate-y-0.5 transition-transform shrink-0" />
               </div>
-            </div>
+            </button>
           </div>
 
-          {/* Center Search Bar (Large & Wide as screenshot) */}
+          {/* Center Search Bar */}
           <div ref={searchContainerRef} className="hidden md:flex flex-1 max-w-2xl relative">
             <form onSubmit={handleSearchSubmit} className="w-full relative">
               <div className="relative flex items-center">
@@ -256,20 +258,20 @@ export const Navbar: React.FC = () => {
                   }}
                   onFocus={() => setIsSearchFocused(true)}
                   placeholder={`Search for ${searchPlaceholders[placeholderIndex]}`}
-                  className="w-full bg-white text-neutral-900 placeholder:text-neutral-400 text-sm pl-11 pr-24 py-3 rounded-lg border border-neutral-300 focus:outline-hidden focus:border-[#15803d] focus:ring-2 focus:ring-emerald-50 transition-all shadow-2xs"
+                  className="w-full bg-white text-neutral-900 placeholder:text-neutral-400 text-sm pl-11 pr-24 py-3 rounded-xl border border-neutral-300 focus:outline-hidden focus:border-[#15803d] focus:ring-2 focus:ring-emerald-50 transition-all shadow-2xs"
                 />
                 {searchQuery.trim() && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-16 text-neutral-400 hover:text-neutral-600 text-xs"
+                    className="absolute right-16 text-neutral-400 hover:text-neutral-600 text-xs cursor-pointer"
                   >
                     Clear
                   </button>
                 )}
                 <button
                   type="submit"
-                  className="absolute right-2 bg-neutral-900 hover:bg-[#15803d] text-white text-xs font-bold px-3.5 py-1.5 rounded-md transition-colors"
+                  className="absolute right-2 bg-neutral-900 hover:bg-[#15803d] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
                   Search
                 </button>
@@ -321,28 +323,32 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Right Action Icons (Login & Shopping Bag) */}
+          {/* Right Action Icons (Login, Cart, Mobile Menu) */}
           <div className="flex items-center gap-4 sm:gap-6">
-            {/* Login Link */}
+            {/* Login / Profile Link */}
             <Link
               to="/login"
               id="nav-login-btn"
-              className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-neutral-900 hover:text-[#15803d] transition-colors py-1.5"
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-neutral-900 hover:text-[#15803d] transition-colors py-1.5"
             >
-              <User className="w-4 h-4 text-neutral-800" />
-              <span>Login</span>
+              <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-700">
+                <User className="w-4 h-4" />
+              </div>
+              <span className="hidden sm:inline">
+                {currentUser ? (userProfile?.name?.split(' ')[0] || 'Account') : 'Login'}
+              </span>
             </Link>
 
             {/* Shopping Bag Icon with Cart Count */}
             <Link
               to="/cart"
               id="nav-cart-btn"
-              className="relative p-1.5 text-neutral-900 hover:text-[#15803d] transition-colors flex items-center justify-center"
+              className="relative p-2 text-neutral-900 hover:text-[#15803d] transition-colors flex items-center justify-center bg-neutral-50 hover:bg-neutral-100 rounded-xl border border-neutral-200"
               aria-label="Shopping Cart"
             >
-              <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+              <ShoppingBag className="w-5 h-5 stroke-[1.8]" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-2 min-w-5 h-5 rounded-full bg-[#15803d] text-white text-[10px] font-bold flex items-center justify-center px-1 border-2 border-white">
+                <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 rounded-full bg-[#15803d] text-white text-[10px] font-black flex items-center justify-center px-1 border-2 border-white shadow-xs">
                   {cartCount}
                 </span>
               )}
@@ -351,7 +357,7 @@ export const Navbar: React.FC = () => {
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-neutral-800 hover:bg-neutral-100"
+              className="md:hidden p-2 rounded-xl text-neutral-800 hover:bg-neutral-100 border border-neutral-200 cursor-pointer"
               aria-label="Open menu"
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -360,7 +366,7 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Mobile Search Bar */}
-        <div className="md:hidden pb-3">
+        <div className="md:hidden pt-3">
           <form onSubmit={handleSearchSubmit} className="relative">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-3 pointer-events-none" />
             <input
@@ -368,16 +374,16 @@ export const Navbar: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search materials (Cement, Wires, Roff, Fevicol...)"
-              className="w-full bg-neutral-50 text-neutral-900 text-xs pl-9 pr-4 py-2.5 rounded-lg border border-neutral-300 focus:outline-hidden focus:bg-white"
+              className="w-full bg-neutral-50 text-neutral-900 text-xs pl-9 pr-4 py-2.5 rounded-xl border border-neutral-300 focus:outline-hidden focus:bg-white"
             />
           </form>
         </div>
       </div>
 
-      {/* 3. CATEGORY NAVIGATION ROW (MATCHING SCREENSHOT) */}
+      {/* 2. CATEGORY NAVIGATION ROW (Home, Civil, Furniture, Electrical, etc.) */}
       <div ref={navContainerRef} className="hidden md:block border-b border-neutral-200 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex items-center justify-center gap-6 lg:gap-8 py-2.5 text-[13px] text-neutral-800 font-medium whitespace-nowrap">
+          <nav className="flex items-center justify-center gap-6 lg:gap-8 py-2.5 text-[13px] text-neutral-800 font-bold whitespace-nowrap">
             {menuItems.map((item) => {
               const isOpen = activeDropdown === item.id;
               return (
@@ -387,7 +393,7 @@ export const Navbar: React.FC = () => {
                       onClick={() => setActiveDropdown(isOpen ? null : (item.id || null))}
                       onMouseEnter={() => setActiveDropdown(item.id || null)}
                       className={`flex items-center gap-1 hover:text-[#15803d] transition-colors py-1 cursor-pointer ${
-                        isOpen ? 'text-[#15803d] font-bold' : ''
+                        isOpen ? 'text-[#15803d] font-black' : ''
                       }`}
                     >
                       <span>{item.label}</span>
@@ -397,7 +403,7 @@ export const Navbar: React.FC = () => {
                     <Link
                       to={item.path}
                       className={`hover:text-[#15803d] transition-colors py-1 ${
-                        location.pathname === item.path ? 'text-[#15803d] font-bold' : ''
+                        location.pathname === item.path ? 'text-[#15803d] font-black' : ''
                       }`}
                     >
                       {item.label}
@@ -410,7 +416,7 @@ export const Navbar: React.FC = () => {
                       onMouseLeave={() => setActiveDropdown(null)}
                       className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-neutral-200 rounded-xl shadow-xl p-2 z-50 animate-fadeIn"
                     >
-                      <div className="p-2 border-b border-neutral-100 text-[11px] font-bold text-neutral-500 uppercase tracking-wider bg-neutral-50 rounded-t-lg">
+                      <div className="p-2 border-b border-neutral-100 text-[11px] font-black text-neutral-500 uppercase tracking-wider bg-neutral-50 rounded-t-lg">
                         {item.label}
                       </div>
                       <div className="divide-y divide-neutral-100 py-1">
@@ -438,6 +444,66 @@ export const Navbar: React.FC = () => {
               );
             })}
           </nav>
+        </div>
+      </div>
+
+      {/* 3. RUNNING NEWS / MESSAGE LINE DIRECTLY BELOW NAVBAR (SHIFTED FROM TOP, RUNNING RIGHT TO LEFT) */}
+      <div className="bg-[#f2b808] border-b border-amber-400 py-2 overflow-hidden select-none relative shadow-2xs">
+        <div className="flex items-center">
+          <div className="flex shrink-0 items-center gap-8 animate-marquee whitespace-nowrap text-xs sm:text-[13px] font-bold text-neutral-950 tracking-normal">
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 fill-black" />
+              <span>Open 8 AM to 9 PM All Days • Guaranteed 60-Min Express Site Delivery</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 fill-rose-600 text-rose-600" />
+              <span>Today's Most Sold Items: UltraTech 53 Grade Cement • Polycab 2.5 sq mm FRLS Wires • Roff T20 Adhesive • Fevicol SH 50kg • CPVC Heavy Pipes • Havells MCBs</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-neutral-900" />
+              <span>Bulk Contractor Pricing & Instant GST Input Tax Credit Invoices Available</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <Truck className="w-3.5 h-3.5 text-neutral-900" />
+              <span>Free Delivery on Site Orders Above ₹1,000 across Kolkata & Hubs</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <PhoneCall className="w-3.5 h-3.5 text-neutral-900" />
+              <span>Contractor On-Site Support: +91 9007168561 / +91 9874569712</span>
+            </span>
+          </div>
+
+          {/* Duplicate loop for seamless infinite marquee */}
+          <div className="flex shrink-0 items-center gap-8 animate-marquee whitespace-nowrap text-xs sm:text-[13px] font-bold text-neutral-950 tracking-normal ml-8" aria-hidden="true">
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 fill-black" />
+              <span>Open 8 AM to 9 PM All Days • Guaranteed 60-Min Express Site Delivery</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 fill-rose-600 text-rose-600" />
+              <span>Today's Most Sold Items: UltraTech 53 Grade Cement • Polycab 2.5 sq mm FRLS Wires • Roff T20 Adhesive • Fevicol SH 50kg • CPVC Heavy Pipes • Havells MCBs</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-neutral-900" />
+              <span>Bulk Contractor Pricing & Instant GST Input Tax Credit Invoices Available</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <Truck className="w-3.5 h-3.5 text-neutral-900" />
+              <span>Free Delivery on Site Orders Above ₹1,000 across Kolkata & Hubs</span>
+            </span>
+            <span className="text-amber-900 font-normal">✦</span>
+            <span className="flex items-center gap-1.5">
+              <PhoneCall className="w-3.5 h-3.5 text-neutral-900" />
+              <span>Contractor On-Site Support: +91 9007168561 / +91 9874569712</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -482,7 +548,7 @@ export const Navbar: React.FC = () => {
 
           <div className="pt-3 border-t border-neutral-200 space-y-2 text-xs">
             <Link to="/login" className="block py-2 text-center font-bold bg-neutral-900 text-white rounded-xl">
-              Contractor Login
+              Contractor Login / Register
             </Link>
             <Link to="/quote" className="block py-2 text-center font-bold bg-[#f2b808] text-black rounded-xl">
               Get Project BOM Quote
@@ -493,3 +559,4 @@ export const Navbar: React.FC = () => {
     </header>
   );
 };
+export default Navbar;

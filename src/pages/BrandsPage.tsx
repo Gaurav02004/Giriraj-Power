@@ -15,7 +15,7 @@ export const BrandsPage: React.FC = () => {
               Authorized Manufacturer Partners
             </h1>
             <p className="text-sm text-neutral-600 mt-1 max-w-2xl">
-              PowerRun is an authorized Tier-1 master distributor for India and the world's most trusted electrical equipment manufacturers.
+              Giriraj Power is an authorized Tier-1 master distributor for India and the world's most trusted electrical equipment manufacturers.
             </p>
           </div>
         </div>

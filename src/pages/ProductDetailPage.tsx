@@ -92,8 +92,47 @@ export const ProductDetailPage: React.FC = () => {
     { label: product.name },
   ];
 
+  // Google Merchant Center structured data (Schema.org/Product)
+  const productSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    image: [product.image, ...(product.galleryImages || [])],
+    description: product.description || product.shortDescription,
+    sku: product.sku,
+    mpn: product.sku,
+    brand: {
+      '@type': 'Brand',
+      name: product.brand,
+    },
+    offers: {
+      '@type': 'Offer',
+      url: window.location.href,
+      priceCurrency: 'INR',
+      price: product.price,
+      priceValidUntil: '2027-12-31',
+      itemCondition: 'https://schema.org/NewCondition',
+      availability: product.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      seller: {
+        '@type': 'Organization',
+        name: 'Giriraj Power',
+      },
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: product.rating,
+      reviewCount: product.reviewsCount,
+    },
+  };
+
   return (
     <div className="bg-white min-h-screen pb-20 text-neutral-900">
+      {/* Google Merchant Center Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+      />
+
       {/* Top Breadcrumbs */}
       <div className="bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
