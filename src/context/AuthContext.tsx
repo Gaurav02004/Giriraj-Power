@@ -165,17 +165,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  // Send OTP to phone number
+  // Send OTP to phone number using Backend Fast2SMS route ('/api/otp/send')
   const sendOtp = async (fullPhoneNumber: string, _containerId?: string): Promise<MockConfirmationResult> => {
-    // Generate 6 digit OTP (default 123456 for effortless verification, or random)
-    const generatedOtp = '123456';
     setPendingPhone(fullPhoneNumber);
-    setPendingOtpCode(generatedOtp);
 
-    console.log(`[Giriraj Power Auth] OTP generated for ${fullPhoneNumber}: ${generatedOtp}`);
+    let verificationId = `otp-verif-${Date.now()}`;
+
+    // Call backend route integrating Fast2SMS Bulk V2 (route: 'otp')
+    const response = await fetch('/api/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: fullPhoneNumber }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data || data.success === false) {
+      const errorMessage = data?.error || `Failed to send OTP via Fast2SMS (HTTP ${response.status})`;
+      console.error(`[Fast2SMS OTP Service Error]`, errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    if (data.verificationId) {
+      verificationId = data.verificationId;
+    }
+    console.log(`[Fast2SMS OTP Service] Success for ${fullPhoneNumber}:`, data);
 
     const mockResult: MockConfirmationResult = {
-      verificationId: `otp-verif-${Date.now()}`,
+      verificationId,
       confirm: async (code: string) => {
         const user = await verifyOtp(code);
         return { user };
@@ -186,24 +203,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return mockResult;
   };
 
-  // Verify 6-digit OTP code
+  // Verify 6-digit OTP code (connects to /api/otp/verify)
   const verifyOtp = async (otpCode: string): Promise<AuthUser> => {
     const cleanCode = otpCode.trim();
-    // Allow '123456' or whatever was generated
-    if (cleanCode !== pendingOtpCode && cleanCode !== '123456' && cleanCode.length !== 6) {
-      const err: any = new Error('Invalid OTP verification code. Please check the 6 digits.');
+    const phone = pendingPhone || '+91 9007168561';
+
+    const response = await fetch('/api/otp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: phone,
+        otpCode: cleanCode,
+        verificationId: confirmationResult?.verificationId,
+      }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data || data.success !== true) {
+      const errorMessage = data?.error || 'Invalid verification code. Please enter the valid OTP or test code 123456.';
+      const err: any = new Error(errorMessage);
       err.code = 'auth/invalid-verification-code';
       throw err;
     }
 
-    const phone = pendingPhone || '+91 9007168561';
     const timestamp = new Date().toISOString();
-    const uid = `phone-user-${phone.replace(/\D/g, '')}`;
+    const uid = data.user?.uid || `phone-user-${phone.replace(/\D/g, '') || '9007168561'}`;
 
     const authUser: AuthUser = {
       uid,
-      displayName: `Contractor (${phone.slice(-4)})`,
-      phoneNumber: phone,
+      displayName: data.user?.displayName || `Contractor Partner (${phone.slice(-4) || '8561'})`,
+      phoneNumber: data.user?.phoneNumber || phone,
       email: null,
       emailVerified: true,
     };
@@ -211,8 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const profile: UserProfile = {
       uid,
       phoneNumber: phone,
-      name: `Contractor Partner (${phone.slice(-4)})`,
-      addresses: ['Kolkata Construction Hub, West Bengal'],
+      name: `Contractor Partner (${phone.slice(-4) || '8561'})`,
+      addresses: ['Topsia Industrial Area, Near EM Bypass, Kolkata, WB - 700039'],
       createdAt: timestamp,
       lastLogin: timestamp,
       isAdmin: phone.includes('9007168561'),

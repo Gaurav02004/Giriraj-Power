@@ -126,6 +126,40 @@ export interface Order {
   createdAt: string;
 }
 
+export interface SavedAddress {
+  id: string;
+  label: string; // e.g. "Primary Site", "Warehouse #2", "Corporate Office"
+  street: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  isDefault?: boolean;
+}
+
+export interface UserProfileData {
+  id?: string;
+  uid: string;
+  phone: string;
+  phoneNumber?: string;
+  fullName: string;
+  name?: string;
+  email?: string;
+  companyName?: string;
+  gstin?: string;
+  businessType?: string;
+  billingAddress?: string;
+  savedAddresses?: SavedAddress[];
+  addresses?: string[];
+  isAdmin?: boolean;
+  is_admin?: boolean;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+}
+
 export interface ToastNotification {
   id: string;
   type: 'success' | 'info' | 'warning' | 'error';

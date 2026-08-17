@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Lock, CheckCircle2, ArrowLeft, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { useShop } from '../../context/ShopContext';
+import { Lock, CheckCircle2, ArrowLeft, Loader2, AlertCircle, RefreshCw, Zap, Sparkles } from 'lucide-react';
 
 interface OtpVerifyProps {
   phoneNumber: string;
   onSuccess?: () => void;
   onChangeNumber?: () => void;
   className?: string;
+  autoFillMock?: boolean;
 }
 
 export const OtpVerify: React.FC<OtpVerifyProps> = ({
@@ -14,8 +16,10 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
   onSuccess,
   onChangeNumber,
   className = '',
+  autoFillMock = false,
 }) => {
   const { verifyOtp, sendOtp } = useAuth();
+  const { showToast } = useShop();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -25,15 +29,20 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    // Focus first input on mount
-    inputRefs.current[0]?.focus();
+    // If autoFillMock is requested or for instant testing, auto fill mock code '123456'
+    if (autoFillMock) {
+      setOtp(['1', '2', '3', '4', '5', '6']);
+    } else {
+      // Focus first input on mount
+      inputRefs.current[0]?.focus();
+    }
 
     const interval = setInterval(() => {
       setTimer((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [autoFillMock]);
 
   const handleChange = (index: number, value: string) => {
     // Only keep numeric character
@@ -70,6 +79,18 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
     }
   };
 
+  // Quick Auto-fill mock OTP (123456)
+  const handleAutoFillMock = (autoSubmit: boolean = false) => {
+    const mockDigits = ['1', '2', '3', '4', '5', '6'];
+    setOtp(mockDigits);
+    setError(null);
+    if (autoSubmit) {
+      handleVerify('123456');
+    } else {
+      inputRefs.current[5]?.focus();
+    }
+  };
+
   const handleVerify = async (otpCode: string) => {
     if (otpCode.length !== 6) {
       setError('Please enter the full 6-digit OTP.');
@@ -81,19 +102,16 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
       setError(null);
       await verifyOtp(otpCode);
       setLoading(false);
+      showToast('Verified Successfully', 'Welcome to Giriraj Power contractor portal.', 'success');
       if (onSuccess) {
         onSuccess();
       }
     } catch (err: any) {
       console.error('OTP verification error:', err);
       setLoading(false);
-      if (err.code === 'auth/invalid-verification-code') {
-        setError('Invalid OTP code. Please re-check the 6 digits sent to your phone.');
-      } else if (err.code === 'auth/code-expired') {
-        setError('The OTP code has expired. Please tap Resend OTP below.');
-      } else {
-        setError(err.message || 'Verification failed. Please try again.');
-      }
+      const raw = err.message || 'Verification failed. Please check your code.';
+      setError(raw);
+      showToast('Verification Failed', raw, 'error');
     }
   };
 
@@ -107,14 +125,18 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
       setTimer(45);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
+      showToast('OTP Resent', `A new OTP was sent to ${phoneNumber} via Fast2SMS.`, 'success');
     } catch (err: any) {
       setResending(false);
-      setError('Failed to resend OTP. Please wait before retrying.');
+      const raw = err.message || 'Failed to resend OTP via Fast2SMS.';
+      setError(raw);
+      showToast('Resend Failed', raw, 'error');
     }
   };
 
   return (
     <div className={`space-y-5 ${className}`}>
+      {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
         <div>
           <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-1.5">
@@ -136,6 +158,26 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
             <span>Change</span>
           </button>
         )}
+      </div>
+
+      {/* MOCK OTP TEST HELPER BANNER */}
+      <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+          <div>
+            <span className="font-bold text-neutral-900">Fixed Mock OTP for Testing: </span>
+            <span className="font-mono font-black text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded text-xs">123456</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleAutoFillMock(false)}
+          className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
+        >
+          <Zap className="w-3 h-3 fill-current" />
+          <span>Auto-Fill</span>
+        </button>
       </div>
 
       {/* 6 OTP Input Boxes */}
@@ -186,24 +228,36 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => handleVerify(otp.join(''))}
-        disabled={loading || otp.some((d) => d === '')}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
-            <span>Verifying OTP...</span>
-          </>
-        ) : (
-          <>
-            <CheckCircle2 className="w-4 h-4 text-yellow-300" />
-            <span>Verify & Access Account</span>
-          </>
-        )}
-      </button>
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => handleVerify(otp.join(''))}
+          disabled={loading || otp.some((d) => d === '')}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
+              <span>Verifying OTP...</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-yellow-300" />
+              <span>Verify & Access Account</span>
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleAutoFillMock(true)}
+          disabled={loading}
+          className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <Zap className="w-3.5 h-3.5 text-amber-600" />
+          <span>1-Click Auto-Fill (123456) & Verify</span>
+        </button>
+      </div>
     </div>
   );
 };

@@ -327,7 +327,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-4 sm:gap-6">
             {/* Login / Profile Link */}
             <Link
-              to="/login"
+              to={currentUser ? '/profile' : '/login'}
               id="nav-login-btn"
               className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-neutral-900 hover:text-[#15803d] transition-colors py-1.5"
             >
@@ -335,7 +335,7 @@ export const Navbar: React.FC = () => {
                 <User className="w-4 h-4" />
               </div>
               <span className="hidden sm:inline">
-                {currentUser ? (userProfile?.name?.split(' ')[0] || 'Account') : 'Login'}
+                {currentUser ? (userProfile?.name?.split(' ')[0] || 'Profile') : 'Login'}
               </span>
             </Link>
 
@@ -547,10 +547,28 @@ export const Navbar: React.FC = () => {
           </div>
 
           <div className="pt-3 border-t border-neutral-200 space-y-2 text-xs">
-            <Link to="/login" className="block py-2 text-center font-bold bg-neutral-900 text-white rounded-xl">
-              Contractor Login / Register
-            </Link>
-            <Link to="/quote" className="block py-2 text-center font-bold bg-[#f2b808] text-black rounded-xl">
+            {currentUser ? (
+              <Link
+                to="/profile"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-2 text-center font-bold bg-neutral-900 text-white rounded-xl"
+              >
+                My Profile & Saved Sites ({userProfile?.name?.split(' ')[0] || 'Contractor'})
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-2 text-center font-bold bg-neutral-900 text-white rounded-xl"
+              >
+                Contractor Login / Register
+              </Link>
+            )}
+            <Link
+              to="/quote"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block py-2 text-center font-bold bg-[#f2b808] text-black rounded-xl"
+            >
               Get Project BOM Quote
             </Link>
           </div>

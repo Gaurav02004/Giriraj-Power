@@ -287,16 +287,18 @@ export const LoginPage: React.FC = () => {
 
                 <div className="flex flex-wrap gap-3">
                   <Link
-                    to="/checkout"
-                    className="flex-1 bg-yellow-400 hover:bg-yellow-300 text-black font-black text-xs py-3 px-4 rounded-xl text-center transition-colors shadow-xs"
+                    to="/profile"
+                    className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-black text-xs py-3 px-4 rounded-xl text-center transition-colors shadow-xs flex items-center justify-center gap-1.5"
                   >
-                    Proceed to 60-Min Checkout →
+                    <User className="w-4 h-4" />
+                    <span>My Profile & Saved Sites →</span>
                   </Link>
                   <Link
-                    to="/admin"
-                    className="bg-black hover:bg-neutral-800 text-white font-bold text-xs py-3 px-4 rounded-xl text-center transition-colors shadow-xs"
+                    to="/checkout"
+                    className="bg-neutral-900 hover:bg-black text-white font-bold text-xs py-3 px-4 rounded-xl text-center transition-colors shadow-xs flex items-center justify-center gap-1.5"
                   >
-                    Open Admin Dispatch
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Checkout</span>
                   </Link>
                   <button
                     onClick={async () => {

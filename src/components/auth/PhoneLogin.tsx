@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Phone, ArrowRight, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { useShop } from '../../context/ShopContext';
+import { Phone, ArrowRight, Loader2, ShieldCheck, AlertCircle, Sparkles, Zap, Radio } from 'lucide-react';
 
 interface PhoneLoginProps {
   onOtpSent?: (phone: string) => void;
@@ -15,10 +16,19 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
   defaultPhone = '',
 }) => {
   const { sendOtp } = useAuth();
+  const { showToast } = useShop();
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState(defaultPhone);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gatewayInfo, setGatewayInfo] = useState<{ configured: boolean; info?: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/otp/status')
+      .then((res) => res.json())
+      .then((data) => setGatewayInfo(data))
+      .catch(() => null);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +36,8 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
 
     const cleanNumber = phoneNumber.replace(/\D/g, '');
     if (cleanNumber.length < 10) {
-      setError('Please enter a valid 10-digit mobile number.');
+      setError('Please enter a valid 10-digit Indian mobile number.');
+      showToast('Invalid Phone', 'Please enter a 10-digit mobile number.', 'warning');
       return;
     }
 
@@ -36,30 +47,46 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
       setLoading(true);
       await sendOtp(fullPhoneNumber, 'recaptcha-container');
       setLoading(false);
+      showToast('OTP Dispatched', `Active Fast2SMS OTP requested for ${fullPhoneNumber}`, 'success');
       if (onOtpSent) {
         onOtpSent(fullPhoneNumber);
       }
     } catch (err: any) {
-      console.error('Phone login error:', err);
+      console.error('Phone login Fast2SMS error:', err);
       setLoading(false);
-      if (err.code === 'auth/invalid-phone-number') {
-        setError('Invalid phone number format. Please enter a valid 10-digit Indian mobile number.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many attempts. Please wait a few minutes before trying again.');
-      } else if (err.code === 'auth/quota-exceeded') {
-        setError('SMS quota reached for today. Please sign in using Email / Password or Gmail.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('SMS Region Policy Required: Phone auth region (+91 India) is not yet enabled in Firebase Console (Authentication > Sign-in method > Phone > SMS region policy) or use a testing phone number.');
-      } else {
-        setError(err.message || 'Failed to send OTP. Please check your connection.');
-      }
+      const rawError = err.message || 'Failed to dispatch OTP via Fast2SMS.';
+      setError(rawError);
+      showToast('Fast2SMS Error', rawError, 'error');
     }
+  };
+
+  const handleQuickFillDemo = () => {
+    setPhoneNumber('9007168561');
+    setError(null);
   };
 
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Invisible reCAPTCHA container */}
       <div id="recaptcha-container" className="hidden"></div>
+
+      {/* Gateway Status Badge */}
+      <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          <Radio className="w-4 h-4 text-emerald-600 animate-pulse shrink-0" />
+          <span className="text-neutral-800 text-[11px] font-medium">
+            Gateway: <strong className="text-emerald-800 font-bold">Fast2SMS Quick SMS (route: 'q')</strong>
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleQuickFillDemo}
+          className="text-[11px] font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-200/80 hover:bg-emerald-300/80 px-2 py-0.5 rounded-md transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+        >
+          <Zap className="w-3 h-3 fill-current" />
+          <span>Fill Demo No</span>
+        </button>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -100,14 +127,24 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
           </div>
           <p className="text-[11px] text-neutral-500 mt-1 flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>We will send a 6-digit OTP via SMS for instant verification.</span>
+            <span>Sends live 6-digit dynamic OTP via Fast2SMS SMS gateway.</span>
           </p>
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{error}</span>
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1 animate-fadeIn">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+              <div>
+                <p className="font-bold">Fast2SMS Error</p>
+                <p className="mt-0.5 text-rose-700">{error}</p>
+              </div>
+            </div>
+            {error.includes('FAST2SMS_API_KEY') && (
+              <p className="text-[11px] text-rose-600 bg-rose-100/70 p-2 rounded-lg mt-2">
+                Tip: Configure your <code className="font-mono font-bold">FAST2SMS_API_KEY</code> in project settings or environment.
+              </p>
+            )}
           </div>
         )}
 
@@ -119,7 +156,7 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin text-yellow-400" />
-              <span>Sending SMS OTP...</span>
+              <span>Sending via Fast2SMS...</span>
             </>
           ) : (
             <>
