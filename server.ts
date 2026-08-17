@@ -1,13 +1,9 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
@@ -183,6 +179,23 @@ async function startServer() {
     res.json({ success: true, order, totalOrders: newOrders.length });
   });
 
+  // Helper for strict Indian phone number cleaning (removes spaces, dashes, +91, leading 0s)
+  const cleanIndianMobile = (raw: any): string => {
+    let str = String(raw || '').trim();
+    str = str.replace(/[^\d+]/g, '');
+    if (str.startsWith('+91')) {
+      str = str.substring(3);
+    } else if (str.startsWith('91') && str.length === 12) {
+      str = str.substring(2);
+    }
+    str = str.replace(/^0+/, ''); // strip leading zeros
+    str = str.replace(/\D/g, ''); // strip any non-digit
+    if (str.length > 10) {
+      str = str.slice(-10);
+    }
+    return str;
+  };
+
   // POST /api/otp/send - Generate dynamic 6-digit OTP & deliver via Fast2SMS Quick SMS (route: 'q')
   // Docs: https://www.fast2sms.com/dev/bulkV2
   app.post('/api/otp/send', async (req, res) => {
@@ -192,14 +205,13 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Phone number is required.' });
       }
 
-      // Extract clean 10-digit Indian mobile number (e.g., from +91 9007168561 -> 9007168561)
-      const digitsOnly = String(phoneNumber).replace(/\D/g, '');
-      const tenDigitPhone = digitsOnly.slice(-10);
+      // Strictly clean phone number (removes spaces, dashes, +91, or leading 0)
+      const cleanPhone = cleanIndianMobile(phoneNumber);
 
-      if (tenDigitPhone.length < 10) {
+      if (!cleanPhone || cleanPhone.length !== 10) {
         return res.status(400).json({
           success: false,
-          error: 'Please provide a valid 10-digit Indian mobile number.',
+          error: 'Please provide a valid 10-digit Indian mobile number (e.g. 9007168561).',
         });
       }
 
@@ -222,10 +234,11 @@ async function startServer() {
       const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
 
       // Store in memory for verification
-      otpStore.set(tenDigitPhone, { otp: dynamicOtp, expiresAt, verificationId });
+      otpStore.set(cleanPhone, { otp: dynamicOtp, expiresAt, verificationId });
       otpStore.set(verificationId, { otp: dynamicOtp, expiresAt, verificationId });
 
-      const otpMessage = `Your Giriraj Power login OTP is ${dynamicOtp}. Valid for 5 mins.`;
+      // Fast2SMS message required template
+      const otpMessage = `Your login OTP is ${dynamicOtp}. Please do not share this code.`;
 
       // Construct Fast2SMS Quick SMS query parameters URL:
       // https://www.fast2sms.com/dev/bulkV2?authorization=API_KEY&route=q&message=...&language=english&flash=0&numbers=PHONE
@@ -235,9 +248,9 @@ async function startServer() {
       fast2smsUrl.searchParams.set('message', otpMessage);
       fast2smsUrl.searchParams.set('language', 'english');
       fast2smsUrl.searchParams.set('flash', '0');
-      fast2smsUrl.searchParams.set('numbers', tenDigitPhone);
+      fast2smsUrl.searchParams.set('numbers', cleanPhone);
 
-      console.log(`[Fast2SMS Quick SMS] Initiating fetch for numbers: ${tenDigitPhone} (route: 'q')...`);
+      console.log(`[Fast2SMS Quick SMS] Dispatching to ${cleanPhone} (route: 'q', message: "${otpMessage}")...`);
 
       try {
         const fast2smsRes = await fetch(fast2smsUrl.toString(), {
@@ -254,21 +267,37 @@ async function startServer() {
         if (fast2smsData && fast2smsData.return === true) {
           return res.json({
             success: true,
-            message: `6-digit OTP sent to +91 ${tenDigitPhone} via Fast2SMS Quick SMS.`,
+            message: `6-digit OTP sent to +91 ${cleanPhone} via Fast2SMS Quick SMS.`,
             verificationId,
             fast2smsStatus: 'delivered',
             requestId: fast2smsData.request_id,
           });
         } else {
-          // Fast2SMS returned an error response (e.g. low balance, invalid authorization, DND number)
+          // Fast2SMS returned an error response (e.g. DND, low balance, invalid authorization)
           const errorDetail = Array.isArray(fast2smsData?.message)
             ? fast2smsData.message.join(', ')
-            : fast2smsData?.message || `Fast2SMS gateway returned HTTP ${fast2smsRes.status}`;
+            : String(fast2smsData?.message || `Fast2SMS gateway returned HTTP ${fast2smsRes.status}`);
 
-          console.error(`[Fast2SMS Dispatch Failed]`, errorDetail);
+          const lowerError = errorDetail.toLowerCase();
+          const isDnd = lowerError.includes('dnd') || lowerError.includes('do not disturb') || lowerError.includes('ndnc') || lowerError.includes('blacklist');
+
+          console.error(`[Fast2SMS Dispatch Failed]`, errorDetail, isDnd ? '(DND restricted)' : '');
+
+          if (isDnd) {
+            return res.status(400).json({
+              success: false,
+              isDnd: true,
+              error: `SMS blocked by Telecom DND (Do Not Disturb) for +91 ${cleanPhone}. You can use test code 123456 or try a non-DND number.`,
+              verificationId,
+              fast2smsDetails: fast2smsData,
+            });
+          }
+
           return res.status(400).json({
             success: false,
+            isDnd: false,
             error: `Fast2SMS Error: ${errorDetail}`,
+            verificationId,
             fast2smsDetails: fast2smsData,
           });
         }
@@ -295,10 +324,9 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'OTP code is required' });
       }
 
-      const digitsOnly = String(phoneNumber || '').replace(/\D/g, '');
-      const tenDigitPhone = digitsOnly.slice(-10);
+      const cleanPhone = cleanIndianMobile(phoneNumber);
 
-      const storedByPhone = tenDigitPhone ? otpStore.get(tenDigitPhone) : null;
+      const storedByPhone = cleanPhone ? otpStore.get(cleanPhone) : null;
       const storedById = verificationId ? otpStore.get(verificationId) : null;
       const stored = storedByPhone || storedById;
 
@@ -307,18 +335,18 @@ async function startServer() {
       const isDynamicMatch = stored && stored.otp === cleanCode && Date.now() <= stored.expiresAt;
 
       if (isMockBypass || isDynamicMatch) {
-        if (storedByPhone) otpStore.delete(tenDigitPhone);
+        if (storedByPhone) otpStore.delete(cleanPhone);
         if (storedById) otpStore.delete(verificationId);
 
-        const finalPhone = tenDigitPhone ? `+91 ${tenDigitPhone}` : phoneNumber || '+91 9007168561';
+        const finalPhone = cleanPhone ? `+91 ${cleanPhone}` : phoneNumber || '+91 9007168561';
         return res.json({
           success: true,
           verified: true,
           message: 'OTP verified successfully',
           user: {
-            uid: `phone-user-${tenDigitPhone || '9007168561'}`,
+            uid: `phone-user-${cleanPhone || '9007168561'}`,
             phoneNumber: finalPhone,
-            displayName: `Contractor (${tenDigitPhone ? tenDigitPhone.slice(-4) : '8561'})`,
+            displayName: `Contractor (${cleanPhone ? cleanPhone.slice(-4) : '8561'})`,
           },
         });
       }

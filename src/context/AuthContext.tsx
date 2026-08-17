@@ -165,17 +165,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  // Send OTP to phone number using Backend Fast2SMS route ('/api/otp/send')
+  // Helper for strictly cleaning Indian mobile numbers
+  const cleanMobile = (raw: string): string => {
+    let str = String(raw || '').trim().replace(/[^\d+]/g, '');
+    if (str.startsWith('+91')) str = str.slice(3);
+    else if (str.startsWith('91') && str.length === 12) str = str.slice(2);
+    str = str.replace(/^0+/, '');
+    str = str.replace(/\D/g, '');
+    if (str.length > 10) str = str.slice(-10);
+    return str;
+  };
+
+  // Send OTP to phone number using Backend Fast2SMS Quick SMS route ('/api/otp/send')
   const sendOtp = async (fullPhoneNumber: string, _containerId?: string): Promise<MockConfirmationResult> => {
-    setPendingPhone(fullPhoneNumber);
+    const cleanPhone = cleanMobile(fullPhoneNumber);
+    const standardPhone = cleanPhone ? `+91 ${cleanPhone}` : fullPhoneNumber;
+    setPendingPhone(standardPhone);
 
     let verificationId = `otp-verif-${Date.now()}`;
 
-    // Call backend route integrating Fast2SMS Bulk V2 (route: 'otp')
+    // Call backend route integrating Fast2SMS Bulk V2 (route: 'q')
     const response = await fetch('/api/otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: fullPhoneNumber }),
+      body: JSON.stringify({ phoneNumber: cleanPhone }),
     });
 
     const data = await response.json().catch(() => null);
@@ -183,13 +196,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!response.ok || !data || data.success === false) {
       const errorMessage = data?.error || `Failed to send OTP via Fast2SMS (HTTP ${response.status})`;
       console.error(`[Fast2SMS OTP Service Error]`, errorMessage);
-      throw new Error(errorMessage);
+      const err: any = new Error(errorMessage);
+      if (data?.isDnd) {
+        err.isDnd = true;
+      }
+      if (data?.verificationId) {
+        // preserve verificationId so test OTP bypass can work even on DND error
+        verificationId = data.verificationId;
+        const fallbackResult: MockConfirmationResult = {
+          verificationId,
+          confirm: async (code: string) => {
+            const user = await verifyOtp(code);
+            return { user };
+          },
+        };
+        setConfirmationResult(fallbackResult);
+      }
+      throw err;
     }
 
     if (data.verificationId) {
       verificationId = data.verificationId;
     }
-    console.log(`[Fast2SMS OTP Service] Success for ${fullPhoneNumber}:`, data);
+    console.log(`[Fast2SMS OTP Service] Success for ${standardPhone}:`, data);
 
     const mockResult: MockConfirmationResult = {
       verificationId,
@@ -206,13 +235,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Verify 6-digit OTP code (connects to /api/otp/verify)
   const verifyOtp = async (otpCode: string): Promise<AuthUser> => {
     const cleanCode = otpCode.trim();
-    const phone = pendingPhone || '+91 9007168561';
+    const cleanPhone = cleanMobile(pendingPhone || '9007168561');
+    const phone = cleanPhone ? `+91 ${cleanPhone}` : '+91 9007168561';
 
     const response = await fetch('/api/otp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        phoneNumber: phone,
+        phoneNumber: cleanPhone,
         otpCode: cleanCode,
         verificationId: confirmationResult?.verificationId,
       }),
@@ -228,11 +258,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const timestamp = new Date().toISOString();
-    const uid = data.user?.uid || `phone-user-${phone.replace(/\D/g, '') || '9007168561'}`;
+    const uid = data.user?.uid || `phone-user-${cleanPhone || '9007168561'}`;
 
     const authUser: AuthUser = {
       uid,
-      displayName: data.user?.displayName || `Contractor Partner (${phone.slice(-4) || '8561'})`,
+      displayName: data.user?.displayName || `Contractor Partner (${cleanPhone.slice(-4) || '8561'})`,
       phoneNumber: data.user?.phoneNumber || phone,
       email: null,
       emailVerified: true,

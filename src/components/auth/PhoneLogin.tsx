@@ -21,6 +21,7 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
   const [phoneNumber, setPhoneNumber] = useState(defaultPhone);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDndError, setIsDndError] = useState(false);
   const [gatewayInfo, setGatewayInfo] = useState<{ configured: boolean; info?: string } | null>(null);
 
   useEffect(() => {
@@ -30,24 +31,36 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
       .catch(() => null);
   }, []);
 
+  // Strict Indian mobile cleaner (strips spaces, dashes, +91, leading 0)
+  const cleanIndianNumber = (raw: string) => {
+    let clean = raw.trim().replace(/[^\d+]/g, '');
+    if (clean.startsWith('+91')) clean = clean.slice(3);
+    else if (clean.startsWith('91') && clean.length === 12) clean = clean.slice(2);
+    clean = clean.replace(/^0+/, '');
+    clean = clean.replace(/\D/g, '');
+    if (clean.length > 10) clean = clean.slice(-10);
+    return clean;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsDndError(false);
 
-    const cleanNumber = phoneNumber.replace(/\D/g, '');
-    if (cleanNumber.length < 10) {
+    const cleanNumber = cleanIndianNumber(phoneNumber);
+    if (cleanNumber.length !== 10) {
       setError('Please enter a valid 10-digit Indian mobile number.');
       showToast('Invalid Phone', 'Please enter a 10-digit mobile number.', 'warning');
       return;
     }
 
-    const fullPhoneNumber = `${countryCode}${cleanNumber}`;
+    const fullPhoneNumber = `${countryCode} ${cleanNumber}`;
 
     try {
       setLoading(true);
-      await sendOtp(fullPhoneNumber, 'recaptcha-container');
+      await sendOtp(cleanNumber, 'recaptcha-container');
       setLoading(false);
-      showToast('OTP Dispatched', `Active Fast2SMS OTP requested for ${fullPhoneNumber}`, 'success');
+      showToast('OTP Dispatched', `Fast2SMS Quick SMS requested for +91 ${cleanNumber}`, 'success');
       if (onOtpSent) {
         onOtpSent(fullPhoneNumber);
       }
@@ -55,14 +68,28 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
       console.error('Phone login Fast2SMS error:', err);
       setLoading(false);
       const rawError = err.message || 'Failed to dispatch OTP via Fast2SMS.';
+      const lower = rawError.toLowerCase();
+      const isDnd = Boolean(err.isDnd) || lower.includes('dnd') || lower.includes('do not disturb') || lower.includes('ndnc');
+
+      setIsDndError(isDnd);
       setError(rawError);
-      showToast('Fast2SMS Error', rawError, 'error');
+      showToast(isDnd ? 'DND Restriction' : 'Fast2SMS Error', rawError, isDnd ? 'warning' : 'error');
     }
   };
 
   const handleQuickFillDemo = () => {
     setPhoneNumber('9007168561');
     setError(null);
+    setIsDndError(false);
+  };
+
+  const handleProceedWithDndBypass = () => {
+    const cleanNumber = cleanIndianNumber(phoneNumber) || '9007168561';
+    const fullPhoneNumber = `${countryCode} ${cleanNumber}`;
+    showToast('Test Mode Active', 'You may enter test OTP 123456 on the next screen.', 'info');
+    if (onOtpSent) {
+      onOtpSent(fullPhoneNumber);
+    }
   };
 
   return (
@@ -132,19 +159,38 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
         </div>
 
         {error && (
-          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1 animate-fadeIn">
+          <div
+            className={`p-3.5 border rounded-xl text-xs space-y-2 animate-fadeIn ${
+              isDndError ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}
+          >
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-              <div>
-                <p className="font-bold">Fast2SMS Error</p>
-                <p className="mt-0.5 text-rose-700">{error}</p>
+              <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isDndError ? 'text-amber-600' : 'text-rose-600'}`} />
+              <div className="flex-1">
+                <p className="font-bold">{isDndError ? 'Telecom DND Restriction' : 'Fast2SMS Delivery Error'}</p>
+                <p className="mt-0.5 leading-relaxed">{error}</p>
               </div>
             </div>
-            {error.includes('FAST2SMS_API_KEY') && (
-              <p className="text-[11px] text-rose-600 bg-rose-100/70 p-2 rounded-lg mt-2">
+
+            {isDndError ? (
+              <div className="pt-1 border-t border-amber-200/80 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-amber-800 font-medium">
+                  Test code <strong>123456</strong> is ready for verification.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleProceedWithDndBypass}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                >
+                  <span>Proceed to OTP Screen</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+            ) : error.includes('FAST2SMS_API_KEY') ? (
+              <p className="text-[11px] text-rose-600 bg-rose-100/70 p-2 rounded-lg mt-1">
                 Tip: Configure your <code className="font-mono font-bold">FAST2SMS_API_KEY</code> in project settings or environment.
               </p>
-            )}
+            ) : null}
           </div>
         )}
 
