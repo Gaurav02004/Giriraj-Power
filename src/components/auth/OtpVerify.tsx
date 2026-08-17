@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useShop } from '../../context/ShopContext';
-import { Lock, CheckCircle2, ArrowLeft, Loader2, AlertCircle, RefreshCw, Zap, Sparkles } from 'lucide-react';
+import { Lock, CheckCircle2, ArrowLeft, Loader2, AlertCircle, RefreshCw, Zap, Sparkles, MessageSquare } from 'lucide-react';
 
 interface OtpVerifyProps {
   phoneNumber: string;
+  initialOtp?: string;
   onSuccess?: () => void;
   onChangeNumber?: () => void;
   className?: string;
@@ -13,12 +14,13 @@ interface OtpVerifyProps {
 
 export const OtpVerify: React.FC<OtpVerifyProps> = ({
   phoneNumber,
+  initialOtp,
   onSuccess,
   onChangeNumber,
   className = '',
   autoFillMock = false,
 }) => {
-  const { verifyOtp, sendOtp } = useAuth();
+  const { verifyOtp, sendOtp, confirmationResult } = useAuth();
   const { showToast } = useShop();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -29,8 +31,11 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    // If autoFillMock is requested or for instant testing, auto fill mock code '123456'
-    if (autoFillMock) {
+    // If initialOtp or confirmationResult has otp, fill it
+    const codeToFill = initialOtp || confirmationResult?.otp;
+    if (codeToFill && codeToFill.length === 6) {
+      setOtp(codeToFill.split(''));
+    } else if (autoFillMock) {
       setOtp(['1', '2', '3', '4', '5', '6']);
     } else {
       // Focus first input on mount
@@ -42,7 +47,7 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [autoFillMock]);
+  }, [autoFillMock, initialOtp, confirmationResult?.otp]);
 
   const handleChange = (index: number, value: string) => {
     // Only keep numeric character
@@ -115,12 +120,35 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
     }
   };
 
-  const handleResendOtp = async () => {
+  // Resend via WhatsApp
+  const handleResendWhatsApp = async () => {
+    try {
+      setResending(true);
+      setError(null);
+      const res = await sendOtp(phoneNumber, 'whatsapp', 'whatsapp');
+      setResending(false);
+      setTimer(45);
+      const dynamicOtp = res.otp || '123456';
+      setOtp(dynamicOtp.split(''));
+
+      const whatsappText = `Hello Giriraj Power, my login verification code is ${dynamicOtp}`;
+      const whatsappUrl =
+        res.whatsappUrl || `https://wa.me/919007168561?text=${encodeURIComponent(whatsappText)}`;
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+
+      showToast('WhatsApp Opened', `Verification code ${dynamicOtp} generated.`, 'success');
+    } catch (err: any) {
+      setResending(false);
+      setError(err.message || 'Failed to resend via WhatsApp');
+    }
+  };
+
+  const handleResendSms = async () => {
     if (timer > 0 || resending) return;
     try {
       setResending(true);
       setError(null);
-      await sendOtp(phoneNumber, 'recaptcha-container');
+      await sendOtp(phoneNumber, 'recaptcha-container', 'sms');
       setResending(false);
       setTimer(45);
       setOtp(['', '', '', '', '', '']);
@@ -144,7 +172,7 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
             <span>Enter 6-Digit OTP</span>
           </h3>
           <p className="text-xs text-neutral-500 mt-0.5">
-            Code sent to <span className="font-mono font-bold text-neutral-900">{phoneNumber}</span>
+            Verification code for <span className="font-mono font-bold text-neutral-900">{phoneNumber}</span>
           </p>
         </div>
 
@@ -160,23 +188,52 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
         )}
       </div>
 
-      {/* MOCK OTP TEST HELPER BANNER */}
-      <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+      {/* WhatsApp verification status card if generated */}
+      {confirmationResult?.otp && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div>
+              <span className="font-bold text-neutral-900">Generated WhatsApp Code: </span>
+              <span className="font-mono font-black text-emerald-800 bg-emerald-200/80 px-1.5 py-0.5 rounded">
+                {confirmationResult.otp}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirmationResult.otp) {
+                setOtp(confirmationResult.otp.split(''));
+                handleVerify(confirmationResult.otp);
+              }
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0"
+          >
+            Auto-Verify
+          </button>
+        </div>
+      )}
+
+      {/* 1-Click Demo Testing Banner */}
+      <div className="p-3 bg-yellow-50/90 border border-yellow-200 rounded-xl flex items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+          <Sparkles className="w-4 h-4 text-yellow-600 shrink-0" />
           <div>
-            <span className="font-bold text-neutral-900">Fixed Mock OTP for Testing: </span>
-            <span className="font-mono font-black text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded text-xs">123456</span>
+            <span className="font-bold text-neutral-900">Demo Test Code: </span>
+            <span className="font-mono font-black text-amber-800 bg-yellow-200/80 px-1.5 py-0.5 rounded text-xs">
+              123456
+            </span>
           </div>
         </div>
 
         <button
           type="button"
           onClick={() => handleAutoFillMock(false)}
-          className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
+          className="inline-flex items-center gap-1 bg-yellow-400 hover:bg-yellow-500 text-black font-black text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
         >
           <Zap className="w-3 h-3 fill-current" />
-          <span>Auto-Fill</span>
+          <span>Auto-Fill (123456)</span>
         </button>
       </div>
 
@@ -200,24 +257,36 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
           ))}
         </div>
 
-        <div className="flex items-center justify-between mt-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3 text-xs">
           <span className="text-neutral-500">
             {timer > 0 ? (
-              <span>Resend OTP in <strong className="text-neutral-900 font-mono">{timer}s</strong></span>
+              <span>Resend in <strong className="text-neutral-900 font-mono">{timer}s</strong></span>
             ) : (
               <span className="text-emerald-700 font-medium">Ready to resend</span>
             )}
           </span>
 
-          <button
-            type="button"
-            onClick={handleResendOtp}
-            disabled={timer > 0 || resending}
-            className="text-emerald-700 hover:text-emerald-900 font-bold disabled:text-neutral-400 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer"
-          >
-            <RefreshCw className={`w-3 h-3 ${resending ? 'animate-spin' : ''}`} />
-            <span>Resend OTP</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleResendWhatsApp}
+              disabled={resending}
+              className="text-[#25D366] hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer"
+            >
+              <MessageSquare className="w-3 h-3" />
+              <span>WhatsApp Resend</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResendSms}
+              disabled={timer > 0 || resending}
+              className="text-neutral-700 hover:text-neutral-900 font-bold disabled:text-neutral-400 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw className={`w-3 h-3 ${resending ? 'animate-spin' : ''}`} />
+              <span>SMS Resend</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -238,7 +307,7 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
-              <span>Verifying OTP...</span>
+              <span>Verifying Code...</span>
             </>
           ) : (
             <>
@@ -255,7 +324,7 @@ export const OtpVerify: React.FC<OtpVerifyProps> = ({
           className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <Zap className="w-3.5 h-3.5 text-amber-600" />
-          <span>1-Click Auto-Fill (123456) & Verify</span>
+          <span>1-Click Auto-Fill (123456) & Direct Sign In</span>
         </button>
       </div>
     </div>

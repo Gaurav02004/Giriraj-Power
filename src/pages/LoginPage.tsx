@@ -48,6 +48,7 @@ export const LoginPage: React.FC = () => {
   
   // Phone OTP State
   const [sentPhoneNumber, setSentPhoneNumber] = useState('');
+  const [sentOtpCode, setSentOtpCode] = useState<string | undefined>(undefined);
   const [isOtpStep, setIsOtpStep] = useState(false);
 
   // Email / Password Login State
@@ -438,17 +439,22 @@ export const LoginPage: React.FC = () => {
                     {isOtpStep ? (
                       <OtpVerify
                         phoneNumber={sentPhoneNumber}
+                        initialOtp={sentOtpCode}
                         onSuccess={handleOtpSuccess}
-                        onChangeNumber={() => setIsOtpStep(false)}
+                        onChangeNumber={() => {
+                          setIsOtpStep(false);
+                          setSentOtpCode(undefined);
+                        }}
                       />
                     ) : (
                       <PhoneLogin
-                        defaultPhone={sentPhoneNumber ? sentPhoneNumber.replace('+91', '') : ''}
-                        onOtpSent={(phone) => {
+                        defaultPhone={sentPhoneNumber ? sentPhoneNumber.replace('+91', '').trim() : '9007168561'}
+                        onOtpSent={(phone, autoFillOtp) => {
                           setSentPhoneNumber(phone);
+                          if (autoFillOtp) setSentOtpCode(autoFillOtp);
                           setIsOtpStep(true);
-                          showToast('OTP Sent', `6-digit verification code sent to ${phone}`, 'success');
                         }}
+                        onSuccess={handleOtpSuccess}
                       />
                     )}
                   </div>

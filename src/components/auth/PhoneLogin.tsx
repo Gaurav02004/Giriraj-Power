@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useShop } from '../../context/ShopContext';
-import { Phone, ArrowRight, Loader2, ShieldCheck, AlertCircle, Sparkles, Zap, Radio } from 'lucide-react';
+import { Phone, ArrowRight, Loader2, ShieldCheck, AlertCircle, Sparkles, Zap, Radio, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 interface PhoneLoginProps {
-  onOtpSent?: (phone: string) => void;
+  onOtpSent?: (phone: string, autoFillOtp?: string) => void;
   onSuccess?: () => void;
   className?: string;
   defaultPhone?: string;
@@ -12,14 +12,15 @@ interface PhoneLoginProps {
 
 export const PhoneLogin: React.FC<PhoneLoginProps> = ({
   onOtpSent,
+  onSuccess,
   className = '',
   defaultPhone = '',
 }) => {
-  const { sendOtp } = useAuth();
+  const { sendOtp, verifyOtp } = useAuth();
   const { showToast } = useShop();
   const [countryCode, setCountryCode] = useState('+91');
-  const [phoneNumber, setPhoneNumber] = useState(defaultPhone);
-  const [loading, setLoading] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState(defaultPhone || '9007168561');
+  const [loadingMode, setLoadingMode] = useState<'whatsapp' | 'sms' | 'demo' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDndError, setIsDndError] = useState(false);
   const [gatewayInfo, setGatewayInfo] = useState<{ configured: boolean; info?: string } | null>(null);
@@ -42,7 +43,80 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
     return clean;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // WhatsApp Verification Flow
+  const handleWhatsAppVerification = async () => {
+    setError(null);
+    setIsDndError(false);
+
+    const cleanNumber = cleanIndianNumber(phoneNumber) || '9007168561';
+    if (cleanNumber.length !== 10) {
+      setError('Please enter a valid 10-digit Indian mobile number for WhatsApp verification.');
+      showToast('Invalid Phone', 'Please enter a 10-digit mobile number.', 'warning');
+      return;
+    }
+
+    const fullPhoneNumber = `${countryCode} ${cleanNumber}`;
+
+    try {
+      setLoadingMode('whatsapp');
+      const result = await sendOtp(cleanNumber, 'whatsapp', 'whatsapp');
+      setLoadingMode(null);
+
+      const generatedOtp = result.otp || Math.floor(100000 + Math.random() * 900000).toString();
+      const whatsappText = `Hello Giriraj Power, my login verification code is ${generatedOtp}`;
+      const whatsappUrl =
+        result.whatsappUrl ||
+        `https://wa.me/919007168561?text=${encodeURIComponent(whatsappText)}`;
+
+      // Open WhatsApp chat in a new tab
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+
+      showToast(
+        'WhatsApp Verification Opened',
+        `Verification code ${generatedOtp} generated. Proceeding to verify code.`,
+        'success'
+      );
+
+      if (onOtpSent) {
+        onOtpSent(fullPhoneNumber, generatedOtp);
+      }
+    } catch (err: any) {
+      console.error('WhatsApp verification error:', err);
+      setLoadingMode(null);
+      const rawError = err.message || 'Failed to initiate WhatsApp verification.';
+      setError(rawError);
+      showToast('WhatsApp Error', rawError, 'error');
+    }
+  };
+
+  // 1-Click Instant Demo Auto-Fill & Login
+  const handleDemoAutoFill = async () => {
+    setError(null);
+    setIsDndError(false);
+    const demoPhone = '9007168561';
+    setPhoneNumber(demoPhone);
+
+    try {
+      setLoadingMode('demo');
+      // Bypass with instant zero-cost verification
+      await verifyOtp('123456');
+      setLoadingMode(null);
+      showToast('Demo Access Granted', 'Instant 1-Click Demo Login successful.', 'success');
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err: any) {
+      console.error('Demo login error:', err);
+      setLoadingMode(null);
+      // If direct verify failed, take user to OTP screen pre-filled
+      if (onOtpSent) {
+        onOtpSent(`+91 ${demoPhone}`, '123456');
+      }
+    }
+  };
+
+  // Live Fast2SMS SMS Dispatch
+  const handleSmsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsDndError(false);
@@ -57,16 +131,16 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
     const fullPhoneNumber = `${countryCode} ${cleanNumber}`;
 
     try {
-      setLoading(true);
-      await sendOtp(cleanNumber, 'recaptcha-container');
-      setLoading(false);
+      setLoadingMode('sms');
+      await sendOtp(cleanNumber, 'recaptcha-container', 'sms');
+      setLoadingMode(null);
       showToast('OTP Dispatched', `Fast2SMS Quick SMS requested for +91 ${cleanNumber}`, 'success');
       if (onOtpSent) {
         onOtpSent(fullPhoneNumber);
       }
     } catch (err: any) {
       console.error('Phone login Fast2SMS error:', err);
-      setLoading(false);
+      setLoadingMode(null);
       const rawError = err.message || 'Failed to dispatch OTP via Fast2SMS.';
       const lower = rawError.toLowerCase();
       const isDnd = Boolean(err.isDnd) || lower.includes('dnd') || lower.includes('do not disturb') || lower.includes('ndnc');
@@ -77,18 +151,12 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
     }
   };
 
-  const handleQuickFillDemo = () => {
-    setPhoneNumber('9007168561');
-    setError(null);
-    setIsDndError(false);
-  };
-
   const handleProceedWithDndBypass = () => {
     const cleanNumber = cleanIndianNumber(phoneNumber) || '9007168561';
     const fullPhoneNumber = `${countryCode} ${cleanNumber}`;
     showToast('Test Mode Active', 'You may enter test OTP 123456 on the next screen.', 'info');
     if (onOtpSent) {
-      onOtpSent(fullPhoneNumber);
+      onOtpSent(fullPhoneNumber, '123456');
     }
   };
 
@@ -97,25 +165,46 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
       {/* Invisible reCAPTCHA container */}
       <div id="recaptcha-container" className="hidden"></div>
 
-      {/* Gateway Status Badge */}
-      <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2">
-          <Radio className="w-4 h-4 text-emerald-600 animate-pulse shrink-0" />
-          <span className="text-neutral-800 text-[11px] font-medium">
-            Gateway: <strong className="text-emerald-800 font-bold">Fast2SMS Quick SMS (route: 'q')</strong>
-          </span>
+      {/* 1-Click Instant Demo Auto-Fill Banner */}
+      <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-yellow-400/15 to-emerald-500/10 border-2 border-yellow-400/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-yellow-400 text-black flex items-center justify-center font-black shrink-0 shadow-2xs">
+            <Zap className="w-4 h-4 fill-current" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-black text-neutral-900">1-Click Demo Auto-Fill</span>
+              <span className="bg-emerald-600 text-white font-bold text-[9px] px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                Zero Cost
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-600">
+              Instant login for testing (+91 9007168561 / code 123456) without SMS charges.
+            </p>
+          </div>
         </div>
+
         <button
           type="button"
-          onClick={handleQuickFillDemo}
-          className="text-[11px] font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-200/80 hover:bg-emerald-300/80 px-2 py-0.5 rounded-md transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+          onClick={handleDemoAutoFill}
+          disabled={loadingMode !== null}
+          className="w-full sm:w-auto bg-yellow-400 hover:bg-yellow-500 text-black font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs hover:shadow-sm active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
         >
-          <Zap className="w-3 h-3 fill-current" />
-          <span>Fill Demo No</span>
+          {loadingMode === 'demo' ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Logging in...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Demo Auto-Fill & Login</span>
+            </>
+          )}
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSmsSubmit} className="space-y-4">
         <div>
           <label className="block text-xs font-bold text-neutral-800 mb-1.5">
             Registered Mobile Number <span className="text-rose-500">*</span>
@@ -147,14 +236,14 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
                   setPhoneNumber(e.target.value.replace(/\D/g, ''));
                   if (error) setError(null);
                 }}
-                disabled={loading}
+                disabled={loadingMode !== null}
                 className="w-full pl-9 pr-3 py-3 text-sm font-mono text-neutral-900 placeholder:text-neutral-400 focus:outline-hidden bg-transparent"
               />
             </div>
           </div>
           <p className="text-[11px] text-neutral-500 mt-1 flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>Sends live 6-digit dynamic OTP via Fast2SMS SMS gateway.</span>
+            <span>Verify instantly via direct WhatsApp message or Fast2SMS gateway.</span>
           </p>
         </div>
 
@@ -167,7 +256,7 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
             <div className="flex items-start gap-2">
               <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isDndError ? 'text-amber-600' : 'text-rose-600'}`} />
               <div className="flex-1">
-                <p className="font-bold">{isDndError ? 'Telecom DND Restriction' : 'Fast2SMS Delivery Error'}</p>
+                <p className="font-bold">{isDndError ? 'Telecom DND Restriction' : 'Authentication Error'}</p>
                 <p className="mt-0.5 leading-relaxed">{error}</p>
               </div>
             </div>
@@ -175,42 +264,74 @@ export const PhoneLogin: React.FC<PhoneLoginProps> = ({
             {isDndError ? (
               <div className="pt-1 border-t border-amber-200/80 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] text-amber-800 font-medium">
-                  Test code <strong>123456</strong> is ready for verification.
+                  Use <strong>WhatsApp Verification</strong> or Test Code <strong>123456</strong>.
                 </span>
                 <button
                   type="button"
                   onClick={handleProceedWithDndBypass}
                   className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
                 >
-                  <span>Proceed to OTP Screen</span>
+                  <span>Proceed with Test OTP</span>
                   <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
             ) : error.includes('FAST2SMS_API_KEY') ? (
               <p className="text-[11px] text-rose-600 bg-rose-100/70 p-2 rounded-lg mt-1">
-                Tip: Configure your <code className="font-mono font-bold">FAST2SMS_API_KEY</code> in project settings or environment.
+                Tip: Configure your <code className="font-mono font-bold">FAST2SMS_API_KEY</code> in project settings or use WhatsApp / Demo mode.
               </p>
             ) : null}
           </div>
         )}
 
+        {/* Primary Action 1: Smart WhatsApp Verification */}
         <button
-          type="submit"
-          disabled={loading || phoneNumber.length < 10}
-          className="w-full bg-black hover:bg-emerald-600 text-white font-bold text-sm py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          type="button"
+          onClick={handleWhatsAppVerification}
+          disabled={loadingMode !== null || phoneNumber.length < 10}
+          className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-sm py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
         >
-          {loading ? (
+          {loadingMode === 'whatsapp' ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin text-yellow-400" />
-              <span>Sending via Fast2SMS...</span>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Opening WhatsApp Verification...</span>
             </>
           ) : (
             <>
-              <span>Get 6-Digit OTP</span>
-              <ArrowRight className="w-4 h-4 text-yellow-400" />
+              <MessageSquare className="w-4 h-4 fill-current" />
+              <span>Verify with WhatsApp (Direct & Fast)</span>
+              <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
+
+        {/* Secondary Action 2: Fast2SMS Quick SMS */}
+        <div className="pt-2 border-t border-neutral-100">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+              <Radio className="w-3 h-3 text-emerald-600" />
+              <span>Secondary Live SMS Gateway</span>
+            </span>
+            <span className="text-[10px] text-neutral-400">route: 'q'</span>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loadingMode !== null || phoneNumber.length < 10}
+            className="w-full bg-neutral-900 hover:bg-black text-white font-bold text-xs py-3 px-4 rounded-xl transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {loadingMode === 'sms' ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-yellow-400" />
+                <span>Dispatching Fast2SMS Quick SMS...</span>
+              </>
+            ) : (
+              <>
+                <Phone className="w-3.5 h-3.5 text-yellow-400" />
+                <span>Send SMS via Fast2SMS</span>
+              </>
+            )}
+          </button>
+        </div>
       </form>
     </div>
   );

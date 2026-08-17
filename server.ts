@@ -196,11 +196,11 @@ async function startServer() {
     return str;
   };
 
-  // POST /api/otp/send - Generate dynamic 6-digit OTP & deliver via Fast2SMS Quick SMS (route: 'q')
+  // POST /api/otp/send - Generate dynamic 6-digit OTP & deliver via Fast2SMS Quick SMS (route: 'q') or WhatsApp flow
   // Docs: https://www.fast2sms.com/dev/bulkV2
   app.post('/api/otp/send', async (req, res) => {
     try {
-      const { phoneNumber } = req.body;
+      const { phoneNumber, channel } = req.body;
       if (!phoneNumber) {
         return res.status(400).json({ success: false, error: 'Phone number is required.' });
       }
@@ -212,6 +212,29 @@ async function startServer() {
         return res.status(400).json({
           success: false,
           error: 'Please provide a valid 10-digit Indian mobile number (e.g. 9007168561).',
+        });
+      }
+
+      // Generate dynamic 6-digit OTP
+      const dynamicOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const verificationId = `verif_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
+
+      // Store in memory for verification
+      otpStore.set(cleanPhone, { otp: dynamicOtp, expiresAt, verificationId });
+      otpStore.set(verificationId, { otp: dynamicOtp, expiresAt, verificationId });
+
+      // If channel is 'whatsapp', construct instant verification WhatsApp payload without SMS cost
+      if (channel === 'whatsapp') {
+        const whatsappText = `Hello Giriraj Power, my login verification code is ${dynamicOtp}`;
+        const whatsappUrl = `https://wa.me/919007168561?text=${encodeURIComponent(whatsappText)}`;
+        return res.json({
+          success: true,
+          channel: 'whatsapp',
+          otp: dynamicOtp,
+          whatsappUrl,
+          verificationId,
+          message: `WhatsApp verification code generated: ${dynamicOtp}`,
         });
       }
 
@@ -227,15 +250,6 @@ async function startServer() {
           error: 'FAST2SMS_API_KEY is not configured. Please add your Fast2SMS API key in Settings / Secrets.',
         });
       }
-
-      // Generate dynamic 6-digit OTP
-      const dynamicOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const verificationId = `verif_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
-
-      // Store in memory for verification
-      otpStore.set(cleanPhone, { otp: dynamicOtp, expiresAt, verificationId });
-      otpStore.set(verificationId, { otp: dynamicOtp, expiresAt, verificationId });
 
       // Fast2SMS message required template
       const otpMessage = `Your Giriraj Power login OTP is ${dynamicOtp}. Valid for 5 mins.`;
@@ -315,40 +329,58 @@ async function startServer() {
   app.post('/api/otp/verify', (req, res) => {
     try {
       const { phoneNumber, otpCode, verificationId } = req.body;
-      const cleanCode = String(otpCode || '').trim();
+      const cleanCode = String(otpCode || '').replace(/\D/g, '').trim();
 
-      if (!cleanCode) {
-        return res.status(400).json({ success: false, error: 'OTP code is required' });
+      if (!cleanCode || cleanCode.length !== 6) {
+        return res.status(400).json({ success: false, error: 'A 6-digit OTP code is required.' });
       }
 
       const cleanPhone = cleanIndianMobile(phoneNumber);
 
+      // Search OTP store by phone, by verificationId, or by any active entry matching OTP
       const storedByPhone = cleanPhone ? otpStore.get(cleanPhone) : null;
       const storedById = verificationId ? otpStore.get(verificationId) : null;
-      const stored = storedByPhone || storedById;
+      let matchingEntry = storedByPhone || storedById;
 
-      // Allow either fixed mock OTP '123456' OR matching stored dynamic OTP
+      if (!matchingEntry) {
+        // Fallback search across all active entries in case phone format had slight mismatch
+        for (const [key, val] of otpStore.entries()) {
+          if (val && val.otp === cleanCode && Date.now() <= val.expiresAt) {
+            matchingEntry = val;
+            break;
+          }
+        }
+      }
+
+      // Allow test bypass code '123456' OR matching stored dynamic OTP
       const isMockBypass = cleanCode === '123456';
-      const isDynamicMatch = stored && stored.otp === cleanCode && Date.now() <= stored.expiresAt;
+      const isDynamicMatch = matchingEntry && matchingEntry.otp === cleanCode && Date.now() <= matchingEntry.expiresAt;
 
       if (isMockBypass || isDynamicMatch) {
-        if (storedByPhone) otpStore.delete(cleanPhone);
-        if (storedById) otpStore.delete(verificationId);
+        if (cleanPhone && otpStore.has(cleanPhone)) otpStore.delete(cleanPhone);
+        if (verificationId && otpStore.has(verificationId)) otpStore.delete(verificationId);
+        if (matchingEntry?.verificationId && otpStore.has(matchingEntry.verificationId)) {
+          otpStore.delete(matchingEntry.verificationId);
+        }
 
-        const finalPhone = cleanPhone ? `+91 ${cleanPhone}` : phoneNumber || '+91 9007168561';
+        const resolvedPhone = cleanPhone || '9007168561';
+        const finalPhone = `+91 ${resolvedPhone}`;
+
+        console.log(`[OTP Verified] Successful login for ${finalPhone} (Bypass: ${isMockBypass}, Dynamic: ${Boolean(isDynamicMatch)})`);
+
         return res.json({
           success: true,
           verified: true,
           message: 'OTP verified successfully',
           user: {
-            uid: `phone-user-${cleanPhone || '9007168561'}`,
+            uid: `phone-user-${resolvedPhone}`,
             phoneNumber: finalPhone,
-            displayName: `Contractor (${cleanPhone ? cleanPhone.slice(-4) : '8561'})`,
+            displayName: `Contractor (${resolvedPhone.slice(-4)})`,
           },
         });
       }
 
-      if (stored && Date.now() > stored.expiresAt) {
+      if (matchingEntry && Date.now() > matchingEntry.expiresAt) {
         return res.status(400).json({
           success: false,
           error: 'OTP has expired (5 minute validity). Please request a new OTP.',

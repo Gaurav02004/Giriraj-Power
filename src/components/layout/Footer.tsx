@@ -93,8 +93,9 @@ export const Footer: React.FC = () => {
                 <GirirajPowerLogo className="w-full h-full" withBg={false} />
               </div>
               <div>
-                <span className="text-2xl font-black tracking-tight text-white">
-                  Giriraj Power
+                <span className="text-2xl font-black tracking-tight">
+                  <span className="text-white">Giriraj</span>{' '}
+                  <span className="text-emerald-400">Power</span>
                 </span>
                 <p className="text-[10px] text-neutral-400 font-semibold tracking-wider uppercase">
                   Construction Materials in 60 Minutes

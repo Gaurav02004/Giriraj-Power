@@ -22,6 +22,9 @@ export interface AuthUser {
 
 export interface MockConfirmationResult {
   verificationId: string;
+  otp?: string;
+  whatsappUrl?: string;
+  channel?: 'sms' | 'whatsapp';
   confirm: (verificationCode: string) => Promise<{ user: AuthUser }>;
 }
 
@@ -32,7 +35,7 @@ interface AuthContextType {
   isAdmin: boolean;
   confirmationResult: MockConfirmationResult | null;
   setupRecaptcha: (containerId?: string) => any;
-  sendOtp: (fullPhoneNumber: string, containerId?: string) => Promise<MockConfirmationResult>;
+  sendOtp: (fullPhoneNumber: string, channelOrContainerId?: string, channel?: 'sms' | 'whatsapp') => Promise<MockConfirmationResult>;
   verifyOtp: (otpCode: string) => Promise<AuthUser>;
   loginWithGoogle: () => Promise<AuthUser>;
   loginWithEmailPassword: (email: string, pass: string) => Promise<AuthUser>;
@@ -176,26 +179,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return str;
   };
 
-  // Send OTP to phone number using Backend Fast2SMS Quick SMS route ('/api/otp/send')
-  const sendOtp = async (fullPhoneNumber: string, _containerId?: string): Promise<MockConfirmationResult> => {
+  // Send OTP to phone number using Backend Fast2SMS Quick SMS or WhatsApp route ('/api/otp/send')
+  const sendOtp = async (
+    fullPhoneNumber: string,
+    channelOrContainerId?: string,
+    channelOption?: 'sms' | 'whatsapp'
+  ): Promise<MockConfirmationResult> => {
     const cleanPhone = cleanMobile(fullPhoneNumber);
     const standardPhone = cleanPhone ? `+91 ${cleanPhone}` : fullPhoneNumber;
     setPendingPhone(standardPhone);
 
+    const activeChannel: 'sms' | 'whatsapp' =
+      channelOption || (channelOrContainerId === 'whatsapp' ? 'whatsapp' : 'sms');
+
     let verificationId = `otp-verif-${Date.now()}`;
 
-    // Call backend route integrating Fast2SMS Bulk V2 (route: 'q')
+    // Call backend route integrating Fast2SMS Bulk V2 (route: 'q') or WhatsApp
     const response = await fetch('/api/otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: cleanPhone }),
+      body: JSON.stringify({
+        phoneNumber: cleanPhone,
+        channel: activeChannel,
+      }),
     });
 
     const data = await response.json().catch(() => null);
 
     if (!response.ok || !data || data.success === false) {
-      const errorMessage = data?.error || `Failed to send OTP via Fast2SMS (HTTP ${response.status})`;
-      console.error(`[Fast2SMS OTP Service Error]`, errorMessage);
+      const errorMessage = data?.error || `Failed to send OTP via ${activeChannel === 'whatsapp' ? 'WhatsApp' : 'Fast2SMS'} (HTTP ${response.status})`;
+      console.error(`[OTP Service Error]`, errorMessage);
       const err: any = new Error(errorMessage);
       if (data?.isDnd) {
         err.isDnd = true;
@@ -205,6 +218,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verificationId = data.verificationId;
         const fallbackResult: MockConfirmationResult = {
           verificationId,
+          otp: data.otp,
+          whatsappUrl: data.whatsappUrl,
+          channel: activeChannel,
           confirm: async (code: string) => {
             const user = await verifyOtp(code);
             return { user };
@@ -218,10 +234,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (data.verificationId) {
       verificationId = data.verificationId;
     }
-    console.log(`[Fast2SMS OTP Service] Success for ${standardPhone}:`, data);
+    console.log(`[OTP Service] Success for ${standardPhone} via ${activeChannel}:`, data);
 
     const mockResult: MockConfirmationResult = {
       verificationId,
+      otp: data.otp,
+      whatsappUrl: data.whatsappUrl,
+      channel: activeChannel,
       confirm: async (code: string) => {
         const user = await verifyOtp(code);
         return { user };
