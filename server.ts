@@ -238,27 +238,24 @@ async function startServer() {
       otpStore.set(verificationId, { otp: dynamicOtp, expiresAt, verificationId });
 
       // Fast2SMS message required template
-      const otpMessage = `Your login OTP is ${dynamicOtp}. Please do not share this code.`;
+      const otpMessage = `Your Giriraj Power login OTP is ${dynamicOtp}. Valid for 5 mins.`;
 
-      // Construct Fast2SMS Quick SMS query parameters URL:
-      // https://www.fast2sms.com/dev/bulkV2?authorization=API_KEY&route=q&message=...&language=english&flash=0&numbers=PHONE
-      const fast2smsUrl = new URL('https://www.fast2sms.com/dev/bulkV2');
-      fast2smsUrl.searchParams.set('authorization', fast2smsApiKey);
-      fast2smsUrl.searchParams.set('route', 'q');
-      fast2smsUrl.searchParams.set('message', otpMessage);
-      fast2smsUrl.searchParams.set('language', 'english');
-      fast2smsUrl.searchParams.set('flash', '0');
-      fast2smsUrl.searchParams.set('numbers', cleanPhone);
-
-      console.log(`[Fast2SMS Quick SMS] Dispatching to ${cleanPhone} (route: 'q', message: "${otpMessage}")...`);
+      console.log(`[Fast2SMS Quick SMS] Dispatching POST to https://www.fast2sms.com/dev/bulkV2 for ${cleanPhone} (route: 'q', message: "${otpMessage}")...`);
 
       try {
-        const fast2smsRes = await fetch(fast2smsUrl.toString(), {
-          method: 'GET',
+        const fast2smsRes = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+          method: 'POST',
           headers: {
-            'cache-control': 'no-cache',
             authorization: fast2smsApiKey,
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            route: 'q',
+            message: otpMessage,
+            language: 'english',
+            flash: 0,
+            numbers: cleanPhone,
+          }),
         });
 
         const fast2smsData = (await fast2smsRes.json().catch(() => null)) as any;
